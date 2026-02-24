@@ -380,6 +380,7 @@ public class MidiLoader {
         Map<Integer, Map<Integer, Integer>> windowChannelOffset = new HashMap<>();
         int lowBound = 54; // F#3
         int highBound = 78; // F#5
+        int targetCenter = 66; // middle of range (F#4)
         for (var windowEntry : windowPitchMap.entrySet()) {
             int windowIdx = windowEntry.getKey();
             Map<Integer, List<Integer>> channelMap = windowEntry.getValue();
@@ -387,26 +388,40 @@ public class MidiLoader {
             for (var channelEntry : channelMap.entrySet()) {
                 int channel = channelEntry.getKey();
                 List<Integer> pitches = channelEntry.getValue();
+                // compute min, max, average
+                int minPitch = 127;
+                int maxPitch = 0;
                 double sum = 0;
-                for (int p : pitches) sum += p;
-                double average = sum / pitches.size();
-                // Compute offset to bring average into the 33-57 range
-                int offset = 0;
-                if (average < lowBound) {
-                    // Need to shift up by octaves
-                    double needed = lowBound - average;
-                    int octaves = (int) Math.ceil(needed / 12);
-                    offset = octaves * 12;
-                } else if (average > highBound) {
-                    // Need to shift down by octaves
-                    double needed = average - highBound;
-                    int octaves = (int) Math.ceil(needed / 12);
-                    offset = -octaves * 12;
+                for (int p : pitches) {
+                    if (p < minPitch) minPitch = p;
+                    if (p > maxPitch) maxPitch = p;
+                    sum += p;
                 }
-                // Limit offset to avoid extreme shifts (max ±4 octaves)
-                if (offset < -48) offset = -48;
-                if (offset > 48) offset = 48;
-                channelOffset.put(channel, offset);
+                double average = sum / pitches.size();
+                // find best offset among possible octave shifts (-4 to +4 octaves)
+                int bestOffset = 0;
+                int bestViolation = Integer.MAX_VALUE;
+                double bestCenterDist = Double.MAX_VALUE;
+                for (int oct = -4; oct <= 4; oct++) {
+                    int offset = oct * 12;
+                    int shiftedMin = minPitch + offset;
+                    int shiftedMax = maxPitch + offset;
+                    // compute violation: amount outside bounds (0 if inside)
+                    int violation = 0;
+                    if (shiftedMin < lowBound) violation += lowBound - shiftedMin;
+                    if (shiftedMax > highBound) violation += shiftedMax - highBound;
+                    // distance of shifted average from target center
+                    double shiftedAvg = average + offset;
+                    double centerDist = Math.abs(shiftedAvg - targetCenter);
+                    // select offset with minimal violation, then minimal center distance
+                    if (violation < bestViolation || (violation == bestViolation && centerDist < bestCenterDist)) {
+                        bestViolation = violation;
+                        bestCenterDist = centerDist;
+                        bestOffset = offset;
+                    }
+                }
+                // Limit offset to avoid extreme shifts (already limited to ±4 octaves)
+                channelOffset.put(channel, bestOffset);
             }
             windowChannelOffset.put(windowIdx, channelOffset);
         }
