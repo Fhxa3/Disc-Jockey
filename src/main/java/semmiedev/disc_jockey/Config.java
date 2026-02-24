@@ -102,6 +102,9 @@ public class Config implements ConfigData {
 
     @ConfigEntry.Gui.Tooltip(count = 3) public boolean instrumentDetectionWorkaround = true;
 
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public boolean enableExperimentalMIDI = false;
+
     @ConfigEntry.Gui.Excluded
     public ArrayList<String> favorites = new ArrayList<>();
 

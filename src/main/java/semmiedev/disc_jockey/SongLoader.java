@@ -26,6 +26,11 @@ public class SongLoader {
             SONG_SUGGESTIONS.clear();
             SONG_SUGGESTIONS.add("Songs are loading, please wait");
             for (File file : Main.songsFolder.listFiles()) {
+                String fileName = file.getName().toLowerCase();
+                // Skip MIDI files if experimental MIDI features are disabled
+                if ((fileName.endsWith(".mid") || fileName.endsWith(".midi")) && !Main.config.enableExperimentalMIDI) {
+                    continue;
+                }
                 Song song = null;
                 try {
                     song = loadSong(file);
@@ -45,6 +50,23 @@ public class SongLoader {
 
     public static Song loadSong(File file) throws IOException {
         if (file.isFile()) {
+            String fileName = file.getName().toLowerCase();
+            if (fileName.endsWith(".mid") || fileName.endsWith(".midi")) {
+                if (!Main.config.enableExperimentalMIDI) {
+                    return null;
+                }
+                try {
+                    Song song = MidiLoader.loadFromMidi(file);
+                    song.displayName = song.name.replaceAll("\\s", "").isEmpty() ? song.fileName : song.name+" ("+song.fileName+")";
+                    song.entry = new SongListWidget.SongEntry(song, SONGS.size());
+                    song.entry.favorite = Main.config.favorites.contains(song.fileName);
+                    song.searchableFileName = song.fileName.toLowerCase().replaceAll("\\s", "");
+                    song.searchableName = song.name.toLowerCase().replaceAll("\\s", "");
+                    return song;
+                } catch (Exception e) {
+                    throw new IOException("Failed to load MIDI file", e);
+                }
+            }
             BinaryReader reader = new BinaryReader(Files.newInputStream(file.toPath()));
             Song song = new Song();
 
