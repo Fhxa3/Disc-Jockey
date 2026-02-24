@@ -96,6 +96,12 @@ public class DiscJockeyScreen extends Screen {
             if (BlocksOverlay.itemStacks == null) {
                 SongListWidget.SongEntry entry = songListWidget.getSelectedOrNull();
                 if (entry != null) {
+                    try {
+                        SongLoader.ensureSongLoaded(entry.song);
+                    } catch (java.io.IOException e) {
+                        Main.LOGGER.error("Failed to load song data for blocks overlay {}", entry.song.fileName, e);
+                        return;
+                    }
                     client.setScreen(null);
 
                     BlocksOverlay.itemStacks = new ItemStack[0];

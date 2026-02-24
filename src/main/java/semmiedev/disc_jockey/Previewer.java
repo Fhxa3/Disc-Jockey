@@ -1,5 +1,6 @@
 package semmiedev.disc_jockey;
 
+import java.io.IOException;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
@@ -14,6 +15,12 @@ public class Previewer implements ClientTickEvents.StartWorldTick {
     private Song song;
 
     public void start(Song song) {
+        try {
+            SongLoader.ensureSongLoaded(song);
+        } catch (IOException e) {
+            Main.LOGGER.error("Failed to load song data for preview {}", song.fileName, e);
+            return;
+        }
         this.song = song;
         Main.TICK_LISTENERS.add(this);
         running = true;

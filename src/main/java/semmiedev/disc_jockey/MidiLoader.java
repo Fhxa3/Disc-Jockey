@@ -10,8 +10,10 @@ import javax.sound.midi.MetaMessage;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.block.enums.NoteBlockInstrument;
 
 public class MidiLoader {
@@ -504,11 +506,12 @@ public class MidiLoader {
         song.notes = noteLongs.stream().mapToLong(Long::longValue).toArray();
 
         // Populate uniqueNotes
+        Set<Note> seen = new HashSet<>();
         for (long noteLong : noteLongs) {
             byte instrumentId = (byte)(noteLong >> Note.INSTRUMENT_SHIFT);
             byte noteId = (byte)(noteLong >> Note.NOTE_SHIFT);
             Note note = new Note(Note.INSTRUMENTS[instrumentId], noteId);
-            if (!song.uniqueNotes.contains(note)) {
+            if (seen.add(note)) {
                 song.uniqueNotes.add(note);
             }
         }
