@@ -113,7 +113,13 @@ public class SongPlayer implements ClientTickEvents.StartWorldTick {
 
             long note = song.notes[index];
             if ((short)note <= Math.round(tick)) {
-                @Nullable BlockPos blockPos = tuner.getNoteBlocks().get(Note.INSTRUMENTS[(byte)(note >> Note.INSTRUMENT_SHIFT)]).get((byte)(note >> Note.NOTE_SHIFT));
+                var instrumentMap = tuner.getNoteBlocks().get(Note.INSTRUMENTS[(byte)(note >> Note.INSTRUMENT_SHIFT)]);
+                if (instrumentMap == null) {
+                    // Instrument got likely mapped to "nothing". Skip it
+                    index++;
+                    continue;
+                }
+                @Nullable BlockPos blockPos = instrumentMap.get((byte)(note >> Note.NOTE_SHIFT));
                 if(blockPos == null) {
                     // Instrument got likely mapped to "nothing". Skip it
                     index++;
