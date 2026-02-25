@@ -169,13 +169,8 @@ public class MidiLoader {
 
     // Returns the appropriate NoteBlockInstrument for a given bank MSB and program.
     private static NoteBlockInstrument getInstrumentForBank(int bankMSB, int program) {
-        int key = (bankMSB << 8) | program;
-        NoteBlockInstrument instrument = BANKED_INSTRUMENT_MAP.get(key);
-        if (instrument != null) {
-            return instrument;
-        }
-        // Fallback to GM mapping (bank 0) if no specific bank mapping exists.
-        return INSTRUMENT_MAP.getOrDefault(program, NoteBlockInstrument.HARP);
+        // Map all non-percussion instruments to HARP
+        return NoteBlockInstrument.HARP;
     }
 
     // Maps MIDI percussion keys (pitch on channel 9) to Minecraft drum sounds.
@@ -230,9 +225,7 @@ public class MidiLoader {
         }
         // Sort by tick
         tempoChanges.sort((a, b) -> Long.compare(a.midiTick, b.midiTick));
-        // Remove duplicates (same tick) - keep last? We'll keep first occurrence, but later events may override earlier? MIDI spec: later events override?
-        // For simplicity, we'll keep all and when querying, find the last event with tick <= target.
-        // We'll deduplicate by tick, keeping the last occurrence.
+        // Remove duplicates (same tick) , keeping the last occurrence.
         Map<Long, Long> uniqueMap = new HashMap<>();
         for (Song.TempoChange tc : tempoChanges) {
             uniqueMap.put(tc.midiTick, tc.mspqn);
@@ -270,9 +263,9 @@ public class MidiLoader {
         // Calculate ticks per bar: ppq * 4 * (numerator / denominator)
         double quarterNotesPerBar = 4.0 * numerator / denominator;
         int ticksPerBar = (int) Math.round(ppq * quarterNotesPerBar);
-        int windowSizeBars = 4; // 4 bars per window
+        int windowSizeBars = 2; // 2 bars per window
         int windowTicks = ticksPerBar * windowSizeBars;
-        if (windowTicks == 0) windowTicks = ppq * 4 * 4; // fallback
+        if (windowTicks == 0) windowTicks = ppq * 4 * 2; // fallback
 
         // --- Note Processing ---
         // Pre‑compute cumulative microseconds for each tempo change
