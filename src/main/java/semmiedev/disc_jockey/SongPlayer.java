@@ -142,7 +142,6 @@ public class SongPlayer implements ClientTickEvents.StartWorldTick {
                 Vec3d unit = Vec3d.ofCenter(blockPos, 0.5).subtract(client.player.getEyePos()).normalize();
                 if(rateLimiter.canSendLookPacket()) {
                     client.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(MathHelper.wrapDegrees((float) (MathHelper.atan2(unit.z, unit.x) * 57.2957763671875) - 90.0f), MathHelper.wrapDegrees((float) (-(MathHelper.atan2(unit.y, Math.sqrt(unit.x * unit.x + unit.z * unit.z)) * 57.2957763671875))), client.player.isOnGround(), client.player.horizontalCollision));                        rateLimiter.onLookPacketSent();
-                    rateLimiter.onLookPacketSent();
                 }
                 if(rateLimiter.canSendAnyPacket()) {
                     // TODO: 5/30/2022 Check if the block needs tuning

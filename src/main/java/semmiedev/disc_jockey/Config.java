@@ -72,20 +72,20 @@ public class Config implements ConfigData {
 
         public int getReducePacketsPer100Millis() {
             return switch(this) {
-                case Limit100 -> 30 / 10;
-                case Limit200 -> 130 / 10;
-                case Limit300 -> 200 / 10;
-                case Limit500 -> 300 / 10;
+                case Limit100 -> 80 / 10;
+                case Limit200 -> 160 / 10;
+                case Limit300 -> 240 / 10;
+                case Limit500 -> 400 / 10;
                 case NoLimit -> Integer.MAX_VALUE;
             };
         }
 
         public int getMaxPacketsPer100Millis() {
             return switch(this) {
-                case Limit100 -> 70 / 10;
-                case Limit200 -> 150 / 10;
-                case Limit300 -> 250 / 10;
-                case Limit500 -> 450 / 10;
+                case Limit100 -> 90 / 10;
+                case Limit200 -> 190 / 10;
+                case Limit300 -> 290 / 10;
+                case Limit500 -> 490 / 10;
                 case NoLimit -> Integer.MAX_VALUE;
             };
         }
