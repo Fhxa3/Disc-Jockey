@@ -1,5 +1,6 @@
 package semmiedev.disc_jockey;
 
+import java.io.IOException;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.ChatHud;
@@ -68,6 +69,14 @@ public class SongPlayer implements ClientTickEvents.StartWorldTick {
         tick = 0;
         index = 0;
         this.song = song;
+        // 确保歌曲的音符数据已加载
+        try {
+            SongLoader.ensureSongLoaded(song);
+        } catch (IOException e) {
+            Main.LOGGER.error("Failed to load song data for {}", song.fileName, e);
+            // 不开始播放
+            return;
+        }
         //Main.LOGGER.info("Song length: " + song.length + " and tempo " + song.tempo);
         if(this.playbackThread == null) startPlaybackThread();
         running = true;
@@ -113,7 +122,13 @@ public class SongPlayer implements ClientTickEvents.StartWorldTick {
 
             long note = song.notes[index];
             if ((short)note <= Math.round(tick)) {
-                @Nullable BlockPos blockPos = tuner.getNoteBlocks().get(Note.INSTRUMENTS[(byte)(note >> Note.INSTRUMENT_SHIFT)]).get((byte)(note >> Note.NOTE_SHIFT));
+                var instrumentMap = tuner.getNoteBlocks().get(Note.INSTRUMENTS[(byte)(note >> Note.INSTRUMENT_SHIFT)]);
+                if (instrumentMap == null) {
+                    // Instrument got likely mapped to "nothing". Skip it
+                    index++;
+                    continue;
+                }
+                @Nullable BlockPos blockPos = instrumentMap.get((byte)(note >> Note.NOTE_SHIFT));
                 if(blockPos == null) {
                     // Instrument got likely mapped to "nothing". Skip it
                     index++;

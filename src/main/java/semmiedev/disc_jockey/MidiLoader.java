@@ -10,8 +10,10 @@ import javax.sound.midi.MetaMessage;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.block.enums.NoteBlockInstrument;
 
 public class MidiLoader {
@@ -167,13 +169,8 @@ public class MidiLoader {
 
     // Returns the appropriate NoteBlockInstrument for a given bank MSB and program.
     private static NoteBlockInstrument getInstrumentForBank(int bankMSB, int program) {
-        int key = (bankMSB << 8) | program;
-        NoteBlockInstrument instrument = BANKED_INSTRUMENT_MAP.get(key);
-        if (instrument != null) {
-            return instrument;
-        }
-        // Fallback to GM mapping (bank 0) if no specific bank mapping exists.
-        return INSTRUMENT_MAP.getOrDefault(program, NoteBlockInstrument.HARP);
+        // Map all non-percussion instruments to HARP
+        return NoteBlockInstrument.HARP;
     }
 
     // Maps MIDI percussion keys (pitch on channel 9) to Minecraft drum sounds.
@@ -228,9 +225,7 @@ public class MidiLoader {
         }
         // Sort by tick
         tempoChanges.sort((a, b) -> Long.compare(a.midiTick, b.midiTick));
-        // Remove duplicates (same tick) - keep last? We'll keep first occurrence, but later events may override earlier? MIDI spec: later events override?
-        // For simplicity, we'll keep all and when querying, find the last event with tick <= target.
-        // We'll deduplicate by tick, keeping the last occurrence.
+        // Remove duplicates (same tick) , keeping the last occurrence.
         Map<Long, Long> uniqueMap = new HashMap<>();
         for (Song.TempoChange tc : tempoChanges) {
             uniqueMap.put(tc.midiTick, tc.mspqn);
@@ -268,9 +263,9 @@ public class MidiLoader {
         // Calculate ticks per bar: ppq * 4 * (numerator / denominator)
         double quarterNotesPerBar = 4.0 * numerator / denominator;
         int ticksPerBar = (int) Math.round(ppq * quarterNotesPerBar);
-        int windowSizeBars = 4; // 4 bars per window
+        int windowSizeBars = 2; // 2 bars per window
         int windowTicks = ticksPerBar * windowSizeBars;
-        if (windowTicks == 0) windowTicks = ppq * 4 * 4; // fallback
+        if (windowTicks == 0) windowTicks = ppq * 4 * 2; // fallback
 
         // --- Note Processing ---
         // Pre‑compute cumulative microseconds for each tempo change
@@ -380,6 +375,7 @@ public class MidiLoader {
         Map<Integer, Map<Integer, Integer>> windowChannelOffset = new HashMap<>();
         int lowBound = 54; // F#3
         int highBound = 78; // F#5
+        int targetCenter = 66; // middle of range (F#4)
         for (var windowEntry : windowPitchMap.entrySet()) {
             int windowIdx = windowEntry.getKey();
             Map<Integer, List<Integer>> channelMap = windowEntry.getValue();
@@ -387,26 +383,40 @@ public class MidiLoader {
             for (var channelEntry : channelMap.entrySet()) {
                 int channel = channelEntry.getKey();
                 List<Integer> pitches = channelEntry.getValue();
+                // compute min, max, average
+                int minPitch = 127;
+                int maxPitch = 0;
                 double sum = 0;
-                for (int p : pitches) sum += p;
-                double average = sum / pitches.size();
-                // Compute offset to bring average into the 33-57 range
-                int offset = 0;
-                if (average < lowBound) {
-                    // Need to shift up by octaves
-                    double needed = lowBound - average;
-                    int octaves = (int) Math.ceil(needed / 12);
-                    offset = octaves * 12;
-                } else if (average > highBound) {
-                    // Need to shift down by octaves
-                    double needed = average - highBound;
-                    int octaves = (int) Math.ceil(needed / 12);
-                    offset = -octaves * 12;
+                for (int p : pitches) {
+                    if (p < minPitch) minPitch = p;
+                    if (p > maxPitch) maxPitch = p;
+                    sum += p;
                 }
-                // Limit offset to avoid extreme shifts (max ±4 octaves)
-                if (offset < -48) offset = -48;
-                if (offset > 48) offset = 48;
-                channelOffset.put(channel, offset);
+                double average = sum / pitches.size();
+                // find best offset among possible octave shifts (-4 to +4 octaves)
+                int bestOffset = 0;
+                int bestViolation = Integer.MAX_VALUE;
+                double bestCenterDist = Double.MAX_VALUE;
+                for (int oct = -4; oct <= 4; oct++) {
+                    int offset = oct * 12;
+                    int shiftedMin = minPitch + offset;
+                    int shiftedMax = maxPitch + offset;
+                    // compute violation: amount outside bounds (0 if inside)
+                    int violation = 0;
+                    if (shiftedMin < lowBound) violation += lowBound - shiftedMin;
+                    if (shiftedMax > highBound) violation += shiftedMax - highBound;
+                    // distance of shifted average from target center
+                    double shiftedAvg = average + offset;
+                    double centerDist = Math.abs(shiftedAvg - targetCenter);
+                    // select offset with minimal violation, then minimal center distance
+                    if (violation < bestViolation || (violation == bestViolation && centerDist < bestCenterDist)) {
+                        bestViolation = violation;
+                        bestCenterDist = centerDist;
+                        bestOffset = offset;
+                    }
+                }
+                // Limit offset to avoid extreme shifts (already limited to ±4 octaves)
+                channelOffset.put(channel, bestOffset);
             }
             windowChannelOffset.put(windowIdx, channelOffset);
         }
@@ -489,11 +499,12 @@ public class MidiLoader {
         song.notes = noteLongs.stream().mapToLong(Long::longValue).toArray();
 
         // Populate uniqueNotes
+        Set<Note> seen = new HashSet<>();
         for (long noteLong : noteLongs) {
             byte instrumentId = (byte)(noteLong >> Note.INSTRUMENT_SHIFT);
             byte noteId = (byte)(noteLong >> Note.NOTE_SHIFT);
             Note note = new Note(Note.INSTRUMENTS[instrumentId], noteId);
-            if (!song.uniqueNotes.contains(note)) {
+            if (seen.add(note)) {
                 song.uniqueNotes.add(note);
             }
         }
