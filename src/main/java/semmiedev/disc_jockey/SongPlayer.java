@@ -17,7 +17,9 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
+
+import java.io.IOException;
 
 public class SongPlayer implements ClientTickEvents.StartLevelTick {
     private static boolean warned;
@@ -74,6 +76,14 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
         tick = 0;
         index = 0;
         this.song = song;
+        // 确保歌曲的音符数据已加载
+        try {
+            SongLoader.ensureSongLoaded(song);
+        } catch (IOException e) {
+            Main.LOGGER.error("Failed to load song data for {}", song.fileName, e);
+            // 不开始播放
+            return;
+        }
         //Main.LOGGER.info("Song length: " + song.length + " and tempo " + song.tempo);
         if (this.playbackThread == null) startPlaybackThread();
         running = true;
@@ -119,7 +129,13 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
 
             long note = song.notes[index];
             if ((short)note <= Math.round(tick)) {
-                @Nullable BlockPos blockPos = tuner.getNoteBlocks().get(Note.INSTRUMENTS[(byte)(note >> Note.INSTRUMENT_SHIFT)]).get((byte)(note >> Note.NOTE_SHIFT));
+                var instrumentMap = tuner.getNoteBlocks().get(Note.INSTRUMENTS[(byte)(note >> Note.INSTRUMENT_SHIFT)]);
+                if (instrumentMap == null) {
+                    // Instrument got likely mapped to "nothing". Skip it
+                    index++;
+                    continue;
+                }
+                @Nullable BlockPos blockPos = instrumentMap.get((byte)(note >> Note.NOTE_SHIFT));
                 if(blockPos == null) {
                     // Instrument got likely mapped to "nothing". Skip it
                     index++;

@@ -8,6 +8,11 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.network.chat.Component;
@@ -25,15 +30,24 @@ public class SongLoader {
             SONGS.clear();
             SONG_SUGGESTIONS.clear();
             SONG_SUGGESTIONS.add("Songs are loading, please wait");
-            for (File file : Main.songsFolder.listFiles()) {
-                Song song = null;
-                try {
-                    song = loadSong(file);
-                } catch (Exception exception) {
-                    Main.LOGGER.error("Unable to read or parse song {}", file.getName(), exception);
-                }
-                if (song != null) SONGS.add(song);
-            }
+            List<Song> loadedSongs = Arrays.stream(Main.songsFolder.listFiles())
+                .parallel()
+                .filter(file -> {
+                    String fileName = file.getName().toLowerCase();
+                    // Skip MIDI files if experimental MIDI features are disabled
+                    return !((fileName.endsWith(".mid") || fileName.endsWith(".midi")) && !Main.config.enableExperimentalMIDI);
+                })
+                .map(file -> {
+                    try {
+                        return loadSong(file, false);
+                    } catch (Exception exception) {
+                        Main.LOGGER.error("Unable to read or parse song {}", file.getName(), exception);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+            SONGS.addAll(loadedSongs);
             for (Song song : SONGS) SONG_SUGGESTIONS.add(song.displayName);
             Main.config.favorites.removeIf(favorite -> SongLoader.SONGS.stream().map(song -> song.fileName).noneMatch(favorite::equals));
 
@@ -44,7 +58,29 @@ public class SongLoader {
     }
 
     public static Song loadSong(File file) throws IOException {
+        return loadSong(file, true);
+    }
+
+    public static Song loadSong(File file, boolean loadNotes) throws IOException {
         if (file.isFile()) {
+            String fileName = file.getName().toLowerCase();
+            if (fileName.endsWith(".mid") || fileName.endsWith(".midi")) {
+                if (!Main.config.enableExperimentalMIDI) {
+                    return null;
+                }
+                try {
+                    Song song = MidiLoader.loadFromMidi(file);
+                    song.displayName = song.name.replaceAll("\\s", "").isEmpty() ? song.fileName : song.name+" ("+song.fileName+")";
+                    song.entry = new SongListWidget.SongEntry(song, SONGS.size());
+                    song.entry.favorite = Main.config.favorites.contains(song.fileName);
+                    song.searchableFileName = song.fileName.toLowerCase().replaceAll("\\s", "");
+                    song.searchableName = song.name.toLowerCase().replaceAll("\\s", "");
+                    return song;
+                } catch (Exception e) {
+                    throw new IOException("Failed to load MIDI file", e);
+                }
+            }
+
             BinaryReader reader = new BinaryReader(Files.newInputStream(file.toPath()));
             Song song = new Song();
 
@@ -87,8 +123,16 @@ public class SongLoader {
             song.searchableFileName = song.fileName.toLowerCase().replaceAll("\\s", "");
             song.searchableName = song.name.toLowerCase().replaceAll("\\s", "");
 
+            if (!loadNotes) {
+                // 提前返回，不解析音符数据
+                // notes 和 uniqueNotes 保持默认空值
+                return song;
+            }
+
             short tick = -1;
             short jumps;
+            ArrayList<Long> noteList = new ArrayList<>();
+            HashSet<Note> uniqueSet = new HashSet<>();
             while ((jumps = reader.readShort()) != 0) {
                 tick += jumps;
                 short layer = -1;
@@ -112,16 +156,47 @@ public class SongLoader {
                     }
 
                     Note note = new Note(Note.INSTRUMENTS[instrumentId], noteId);
-                    if (!song.uniqueNotes.contains(note)) song.uniqueNotes.add(note);
+                    if (uniqueSet.add(note)) {
+                        song.uniqueNotes.add(note);
+                    }
 
-                    song.notes = Arrays.copyOf(song.notes, song.notes.length + 1);
-                    song.notes[song.notes.length - 1] = tick | layer << Note.LAYER_SHIFT | (long)instrumentId << Note.INSTRUMENT_SHIFT | (long)noteId << Note.NOTE_SHIFT;
+                    long noteLong = tick | layer << Note.LAYER_SHIFT | (long)instrumentId << Note.INSTRUMENT_SHIFT | (long)noteId << Note.NOTE_SHIFT;
+                    noteList.add(noteLong);
                 }
             }
+            song.notes = noteList.stream().mapToLong(Long::longValue).toArray();
 
             return song;
         }
         return null;
+    }
+
+    public static void ensureSongLoaded(Song song) throws IOException {
+        // 如果歌曲已经加载了音符数据，则直接返回
+        if (song.notes != null && song.notes.length > 0) {
+            return;
+        }
+        // 根据文件名找到对应的文件
+        File songFile = null;
+        for (File file : Main.songsFolder.listFiles()) {
+            if (file.getName().equals(song.fileName)) {
+                songFile = file;
+                break;
+            }
+        }
+        if (songFile == null) {
+            throw new IOException("Song file not found: " + song.fileName);
+        }
+        // 加载完整的歌曲数据（包括音符）
+        Song fullSong = loadSong(songFile, true);
+        if (fullSong == null) {
+            throw new IOException("Failed to load song: " + song.fileName);
+        }
+        // 将音符数据复制到原歌曲对象中
+        song.notes = fullSong.notes;
+        song.uniqueNotes.clear();
+        song.uniqueNotes.addAll(fullSong.uniqueNotes);
+        // 其他字段（如length, tempo等）应该已经正确，无需覆盖
     }
 
     public static void sort() {

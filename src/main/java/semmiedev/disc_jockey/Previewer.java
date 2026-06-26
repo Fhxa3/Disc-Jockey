@@ -6,6 +6,8 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
 
+import java.io.IOException;
+
 public class Previewer implements ClientTickEvents.StartLevelTick {
     public boolean running;
 
@@ -14,6 +16,13 @@ public class Previewer implements ClientTickEvents.StartLevelTick {
     private Song song;
 
     public void start(Song song) {
+        // 确保歌曲的音符数据已加载
+        try {
+            SongLoader.ensureSongLoaded(song);
+        } catch (IOException e) {
+            Main.LOGGER.error("Failed to load song data for preview: {}", song.fileName, e);
+            return;
+        }
         this.song = song;
         Main.TICK_LISTENERS.add(this);
         running = true;
