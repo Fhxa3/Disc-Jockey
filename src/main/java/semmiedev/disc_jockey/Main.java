@@ -73,10 +73,10 @@ public class Main implements ClientModInitializer {
                 if (openScreenKeyBind.consumeClick()) {
                     if (SongLoader.loadingSongs) {
 //                        client.gui.getChat().addMessage(Component.translatable(Main.MOD_ID+".still_loading").withStyle(ChatFormatting.RED));
-                        client.gui.getChat().addMessage(Component.translatable(Main.MOD_ID+".still_loading").withStyle(ChatFormatting.RED), (MessageSignature) null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+                        client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".still_loading").withStyle(ChatFormatting.RED), (MessageSignature) null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
                         SongLoader.showToast = true;
                     } else {
-                        client.setScreen(new DiscJockeyScreen());
+                        client.gui.setScreen(new DiscJockeyScreen());
                     }
                 }
             }

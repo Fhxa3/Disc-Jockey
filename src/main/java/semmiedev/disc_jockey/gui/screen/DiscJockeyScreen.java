@@ -100,7 +100,7 @@ public class DiscJockeyScreen extends Screen {
             if (BlocksOverlay.itemStacks == null) {
                 SongListWidget.SongEntry entry = songListWidget.getSelected();
                 if (entry != null) {
-                    minecraft.setScreen(null);
+                    minecraft.gui.setScreen(null);
 
                     BlocksOverlay.itemStacks = new ItemStack[0];
                     BlocksOverlay.amounts = new int[0];
@@ -130,7 +130,7 @@ public class DiscJockeyScreen extends Screen {
                 }
             } else {
                 BlocksOverlay.itemStacks = null;
-                minecraft.setScreen(null);
+                minecraft.gui.setScreen(null);
             }
         }).bounds((width / 4 * 3) + 60, height - 61, 100, 20).build());
 
@@ -172,7 +172,7 @@ public class DiscJockeyScreen extends Screen {
         addRenderableWidget(stopButton);
 
         // Config button in bottom left
-        configButton = Button.builder(CONFIG, (button) -> minecraft.setScreen(AutoConfigClient.getConfigScreen(Config.class, this).get()))
+        configButton = Button.builder(CONFIG, (button) -> minecraft.gui.setScreen(AutoConfigClient.getConfigScreen(Config.class, this).get()))
                 .pos(10, height - 30)
                 .size(100, 20)
                 .build();
@@ -250,7 +250,7 @@ public class DiscJockeyScreen extends Screen {
         String string = paths.stream().map(Path::getFileName).map(Path::toString).collect(Collectors.joining(", "));
         if (string.length() > 300) string = string.substring(0, 300)+"...";
 
-        minecraft.setScreen(new ConfirmScreen(confirmed -> {
+        minecraft.gui.setScreen(new ConfirmScreen(confirmed -> {
             if (confirmed) {
                 paths.forEach(path -> {
                     try {
@@ -270,7 +270,7 @@ public class DiscJockeyScreen extends Screen {
 
                 SongLoader.sort();
             }
-            minecraft.setScreen(this);
+            minecraft.gui.setScreen(this);
         }, Component.translatable(Main.MOD_ID+".screen.drop_confirm"), Component.literal(string)));
     }
 

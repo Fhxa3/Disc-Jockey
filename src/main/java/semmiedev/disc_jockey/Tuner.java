@@ -1,6 +1,7 @@
 package semmiedev.disc_jockey;
 
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -14,7 +15,6 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
-import net.minecraft.util.Tuple;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.NoteBlock;
@@ -28,7 +28,7 @@ public class Tuner {
 
     private HashMap<NoteBlockInstrument, HashMap<Byte, BlockPos>> noteBlocks = null;
     private long tunedAfter = Util.TIMESTAMP_UNINITIALIZED;
-    private final HashMap<BlockPos, Tuple<Integer, Long>> notePredictions = new HashMap<>();
+    private final HashMap<BlockPos, Pair<Integer, Long>> notePredictions = new HashMap<>();
     private HashMap<Block, Integer> missingInstrumentBlocks = new HashMap<>();
     private long lastInteractAt = -1;
     private float availableInteracts = 8;
@@ -44,8 +44,8 @@ public class Tuner {
     public void cleanup() {
         // Clear outdated note predictions
         ArrayList<BlockPos> outdatedPredictions = new ArrayList<>();
-        for (Map.Entry<BlockPos, Tuple<Integer, Long>> entry : notePredictions.entrySet()) {
-            if (entry.getValue().getB() < Util.now())
+        for (Map.Entry<BlockPos, Pair<Integer, Long>> entry : notePredictions.entrySet()) {
+            if (entry.getValue().getRight() < Util.now())
                 outdatedPredictions.add(entry.getKey());
         }
         for (BlockPos outdatedPrediction : outdatedPredictions) notePredictions.remove(outdatedPrediction);
@@ -288,7 +288,7 @@ public class Tuner {
             BlockPos blockPos = noteBlocks.get(note.instrument()).get(note.note());
             if (blockPos == null) continue;
             BlockState blockState = client.level.getBlockState(blockPos);
-            int assumedNote = notePredictions.containsKey(blockPos) ? notePredictions.get(blockPos).getA() : blockState.getValue(BlockStateProperties.NOTE);
+            int assumedNote = notePredictions.containsKey(blockPos) ? notePredictions.get(blockPos).getLeft() : blockState.getValue(BlockStateProperties.NOTE);
 
             if (blockState.hasProperty(BlockStateProperties.NOTE)) {
                 if (assumedNote == note.note() && blockState.getValue(BlockStateProperties.NOTE) == note.note())
@@ -360,8 +360,8 @@ public class Tuner {
 
             lastTunedNote = untunedNotes.get(blockPos);
             untunedNotes.remove(blockPos);
-            int assumedNote = notePredictions.containsKey(blockPos) ? notePredictions.get(blockPos).getA() : client.level.getBlockState(blockPos).getValue(BlockStateProperties.NOTE);
-            notePredictions.put(blockPos, new Tuple<>((assumedNote + 1) % 25, Util.now() + ping * 2 + 100));
+            int assumedNote = notePredictions.containsKey(blockPos) ? notePredictions.get(blockPos).getLeft() : client.level.getBlockState(blockPos).getValue(BlockStateProperties.NOTE);
+            notePredictions.put(blockPos, Pair.of((assumedNote + 1) % 25, Util.now() + ping * 2 + 100));
             client.gameMode.useItemOn(client.player, InteractionHand.MAIN_HAND, new BlockHitResult(Vec3.atCenterOf(blockPos), Direction.UP, blockPos, false));
             lastInteractAt = Util.now();
             availableInteracts -= 1f;

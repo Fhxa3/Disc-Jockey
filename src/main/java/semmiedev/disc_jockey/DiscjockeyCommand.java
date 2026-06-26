@@ -36,7 +36,7 @@ public class DiscjockeyCommand {
                             FabricClientCommandSource source = context.getSource();
                             if (!isLoading(context)) {
                                 Minecraft client = source.getClient();
-                                client.schedule(() -> client.setScreen(new DiscJockeyScreen()));
+                                client.schedule(() -> client.gui.setScreen(new DiscJockeyScreen()));
                                 return 1;
                             }
                             return 0;
