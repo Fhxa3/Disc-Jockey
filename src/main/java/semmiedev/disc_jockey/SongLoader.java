@@ -70,7 +70,7 @@ public class SongLoader {
                 }
                 try {
                     Song song = MidiLoader.loadFromMidi(file);
-                    song.displayName = song.name.replaceAll("\\s", "").isEmpty() ? song.fileName : song.name+" ("+song.fileName+")";
+                    song.displayName = song.name.replaceAll("\\s", "").isEmpty() ? (song.fileName.replaceAll("(?i)\\.midi?$", "") + " [midi]") : song.name + " [midi]";
                     song.entry = new SongListWidget.SongEntry(song, SONGS.size());
                     song.entry.favorite = Main.config.favorites.contains(song.fileName);
                     song.searchableFileName = song.fileName.toLowerCase().replaceAll("\\s", "");
