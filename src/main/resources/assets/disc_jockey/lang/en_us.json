@@ -78,5 +78,9 @@
   "text.autoconfig.disc_jockey.option.instrumentDetectionWorkaround": "Instrument Detection Workaround",
   "text.autoconfig.disc_jockey.option.instrumentDetectionWorkaround.@Tooltip[0]": "There have been some instances where a noteblock does not properly detect the instrument it's supposed to be.",
   "text.autoconfig.disc_jockey.option.instrumentDetectionWorkaround.@Tooltip[1]": "This can cause Disc Jockey to falsely report not finding some instruments. However this will probably",
-  "text.autoconfig.disc_jockey.option.instrumentDetectionWorkaround.@Tooltip[2]": "break custom block plugins (like Nexo) that wanna alter instruments."
+  "text.autoconfig.disc_jockey.option.instrumentDetectionWorkaround.@Tooltip[2]": "break custom block plugins (like Nexo) that wanna alter instruments.",
+  "text.autoconfig.disc_jockey.option.enableExperimentalMIDI": "Enable Experimental MIDI",
+  "text.autoconfig.disc_jockey.option.enableExperimentalMIDI.@Tooltip[0]": "Fhax3 added automatic recognition and conversion of MIDI music in v1.9.2-34f5536.",
+  "text.autoconfig.disc_jockey.option.enableExperimentalMIDI.@Tooltip[1]": "This change takes effect after reloading all songs",
+  "modmenu.descriptionTranslation.disc_jockey": "Play note block songs in Minecraft"
 }
