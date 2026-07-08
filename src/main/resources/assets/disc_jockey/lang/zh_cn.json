@@ -78,5 +78,9 @@
   "text.autoconfig.disc_jockey.option.instrumentDetectionWorkaround": "乐器检测变通方法",
   "text.autoconfig.disc_jockey.option.instrumentDetectionWorkaround.@Tooltip[0]": "在某些情况下，音符盒无法正确检测到它应该是什么乐器。",
   "text.autoconfig.disc_jockey.option.instrumentDetectionWorkaround.@Tooltip[1]": "这可能导致 Disc Jockey 错误地报告找不到某些乐器。然而，这可能会",
-  "text.autoconfig.disc_jockey.option.instrumentDetectionWorkaround.@Tooltip[2]": "破坏想要改变乐器的自定义方块插件（如 Nexo）。"
+  "text.autoconfig.disc_jockey.option.instrumentDetectionWorkaround.@Tooltip[2]": "破坏想要改变乐器的自定义方块插件（如 Nexo）。",
+  "text.autoconfig.disc_jockey.option.enableExperimentalMIDI": "启用实验性MIDI识别",
+  "text.autoconfig.disc_jockey.option.enableExperimentalMIDI.@Tooltip[0]": "Fhax3在v1.9.2-34f5536中添加了MIDI音乐的自动识别和转换。",
+  "text.autoconfig.disc_jockey.option.enableExperimentalMIDI.@Tooltip[1]": "该更改在重载所有歌曲后生效",
+  "modmenu.descriptionTranslation.disc_jockey": "在游戏中演奏nbs歌曲"
 }
