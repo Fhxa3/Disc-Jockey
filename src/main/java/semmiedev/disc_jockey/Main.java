@@ -1,9 +1,8 @@
 package semmiedev.disc_jockey;
 
-import io.netty.buffer.ByteBuf;
+import com.mojang.blaze3d.platform.InputConstants;
 import me.shedaniel.autoconfig.AutoConfig;
 import me.shedaniel.autoconfig.ConfigHolder;
-import me.shedaniel.autoconfig.serializer.JanksonConfigSerializer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -21,10 +20,9 @@ import net.minecraft.network.chat.MessageSignature;
 import net.minecraft.network.chat.MutableComponent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 import semmiedev.disc_jockey.gui.screen.DiscJockeyScreen;
-import com.mojang.blaze3d.platform.InputConstants;
+
 import java.io.File;
 import java.util.ArrayList;
 
@@ -42,8 +40,10 @@ public class Main implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        configHolder = AutoConfig.register(Config.class, JanksonConfigSerializer::new);
+        configHolder = AutoConfig.register(Config.class, CustomConfigSerializer::new);
         config = configHolder.getConfig();
+
+        
 
         songsFolder = new File(FabricLoader.getInstance().getConfigDir()+File.separator+MOD_ID+File.separator+"songs");
         if (!songsFolder.isDirectory()) songsFolder.mkdirs();

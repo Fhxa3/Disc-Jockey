@@ -11,10 +11,11 @@ public class Song {
     public long[] notes = new long[0];
 
     public short length, height, tempo, loopStartTick;
-    public String fileName, name, author, originalAuthor, description, displayName;
+    public String fileName, filePath, name, author, originalAuthor, description, displayName;
     public byte autoSaving, autoSavingDuration, timeSignature, vanillaInstrumentCount, formatVersion, loop, maxLoopCount;
     public int minutesSpent, leftClicks, rightClicks, blocksAdded, blocksRemoved;
     public String importFileName;
+    public SongLoader.SongFolder folder;
 
     // MIDI-specific fields for variable tempo
     public int midiPpq = 0; // pulses per quarter note, 0 for NBS songs

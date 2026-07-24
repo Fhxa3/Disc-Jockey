@@ -82,5 +82,8 @@
   "text.autoconfig.disc_jockey.option.enableExperimentalMIDI": "启用实验性MIDI识别",
   "text.autoconfig.disc_jockey.option.enableExperimentalMIDI.@Tooltip[0]": "Fhax3在v1.9.2-34f5536中添加了MIDI音乐的自动识别和转换。",
   "text.autoconfig.disc_jockey.option.enableExperimentalMIDI.@Tooltip[1]": "该更改在重载所有歌曲后生效",
+  "text.autoconfig.disc_jockey.option.autoScrollToLastSelected": "自动滚动到上次所选",
+  "text.autoconfig.disc_jockey.option.autoScrollToLastSelected.@Tooltip[0]": "打开菜单时自动滚动到上次所选的歌曲。",
+  "text.autoconfig.disc_jockey.option.autoScrollToLastSelected.@Tooltip[1]": "同时自动导航到包含上次所选歌曲的文件夹。",
   "modmenu.descriptionTranslation.disc_jockey": "在游戏中演奏nbs歌曲"
 }

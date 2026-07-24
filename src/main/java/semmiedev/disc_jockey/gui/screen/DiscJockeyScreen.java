@@ -3,11 +3,7 @@ package semmiedev.disc_jockey.gui.screen;
 import me.shedaniel.autoconfig.AutoConfigClient;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.AbstractSelectionList;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.CycleButton;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.*;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -53,8 +49,9 @@ public class DiscJockeyScreen extends Screen {
 
     private SongListWidget songListWidget;
     private Button playButton, previewButton;
-    private boolean shouldFilter;
+    public boolean shouldFilter;
     private String query = "";
+    public SongLoader.SongFolder currentFolder = null;
 
     public DiscJockeyScreen() {
         super(Main.NAME);
@@ -63,23 +60,40 @@ public class DiscJockeyScreen extends Screen {
     @Override
     protected void init() {
         shouldFilter = true;
-        songListWidget = new SongListWidget(minecraft, width / 2 - 10, height - 64 - 32, 32, 20);
+
+        if (!Main.config.autoScrollToLastSelected) {
+            for (Song song : SongLoader.SONGS) {
+                if (song.entry != null) {
+                    song.entry.setSelected(false);
+                }
+            }
+            if (!Main.config.lastSelectedSong.isEmpty()) {
+                Main.config.lastSelectedSong = "";
+                Main.configHolder.save();
+            }
+        }
+
+        if (Main.config.autoScrollToLastSelected && !Main.config.lastSelectedSong.isEmpty()) {
+            for (Song song : SongLoader.SONGS) {
+                if (song.fileName.equals(Main.config.lastSelectedSong) && song.folder != null) {
+                    currentFolder = song.folder;
+                    break;
+                }
+            }
+        }
+
+        SongLoader.currentFolder = currentFolder;
+        songListWidget = new SongListWidget(minecraft, width / 2 - 10, height - 64 - 32, 32, 20, this);
         songListWidget.setX(width / 2);
         addRenderableWidget(songListWidget);
-        for (int i = 0; i < SongLoader.SONGS.size(); i++) {
-            Song song = SongLoader.SONGS.get(i);
-            song.entry.songListWidget = songListWidget;
-            if (song.entry.selected) songListWidget.setSelected(song.entry);
-        }
 
         playButton = Button.builder(PLAY, button -> {
             if (Main.SONG_PLAYER.running) {
                 Main.SONG_PLAYER.stop();
             } else {
-                SongListWidget.SongEntry entry = songListWidget.getSelected();
+                SongListWidget.SongEntry entry = songListWidget.getSelectedSongOrNull();
                 if (entry != null) {
                     Main.SONG_PLAYER.start(entry.song);
-                    //client.setScreen(null);
                 }
             }
         }).bounds((width / 4 * 3) - 160, height - 61, 100, 20).build();
@@ -89,16 +103,15 @@ public class DiscJockeyScreen extends Screen {
             if (Main.PREVIEWER.running) {
                 Main.PREVIEWER.stop();
             } else {
-                SongListWidget.SongEntry entry = songListWidget.getSelected();
+                SongListWidget.SongEntry entry = songListWidget.getSelectedSongOrNull();
                 if (entry != null) Main.PREVIEWER.start(entry.song);
             }
         }).bounds((width / 4 * 3) - 50, height - 61, 100, 20).build();
         addRenderableWidget(previewButton);
 
         addRenderableWidget(Button.builder(Component.translatable(Main.MOD_ID+".screen.blocks"), button -> {
-            // TODO: 6/2/2022 Add an auto build mode
             if (BlocksOverlay.itemStacks == null) {
-                SongListWidget.SongEntry entry = songListWidget.getSelected();
+                SongListWidget.SongEntry entry = songListWidget.getSelectedSongOrNull();
                 if (entry != null) {
                     minecraft.gui.setScreen(null);
 
@@ -144,13 +157,9 @@ public class DiscJockeyScreen extends Screen {
         });
         addRenderableWidget(searchBar);
 
-        // TODO: 6/2/2022 Add a reload button
-
-        // Player:
         songState = new StringWidget(10, 32, width / 2 - 20, 20, Component.empty(), getFont());
         addRenderableWidget(songState);
         songTitle = new StringWidget(10, 32 + 20, width / 2 - 20, 20, Component.empty(), getFont());
-        //songTitle.alignLeft();
         addRenderableWidget(songTitle);
         timeBar = new SongTimeSliderWidget(10, 32 + 20 + 20, width / 2 - 20, 30);
         addRenderableWidget(timeBar);
@@ -159,7 +168,7 @@ public class DiscJockeyScreen extends Screen {
                 .withValues(true, false)
                 .create((width / 4) - 25, 32 + 20 + 20 + 30 + 5, 20, 20, Component.empty(), (button, value) -> {
             if (value && Main.SONG_PLAYER.song != null && Main.SONG_PLAYER.didSongReachEnd) {
-                Main.SONG_PLAYER.start(Main.SONG_PLAYER.song); // Restart song
+                Main.SONG_PLAYER.start(Main.SONG_PLAYER.song);
             } else {
                 Main.SONG_PLAYER.running = value;
             }
@@ -171,7 +180,6 @@ public class DiscJockeyScreen extends Screen {
                 .build();
         addRenderableWidget(stopButton);
 
-        // Config button in bottom left
         configButton = Button.builder(CONFIG, (button) -> minecraft.gui.setScreen(AutoConfigClient.getConfigScreen(Config.class, this).get()))
                 .pos(10, height - 30)
                 .size(100, 20)
@@ -228,21 +236,125 @@ public class DiscJockeyScreen extends Screen {
         if (shouldFilter) {
             shouldFilter = false;
             songListWidget.setScrollAmount(0);
-            java.util.List<SongListWidget.SongEntry> newEntries = new java.util.ArrayList<>();
+            java.util.List<SongListWidget.Entry> newEntries = new java.util.ArrayList<>();
             boolean empty = query.isEmpty();
-            int favoriteIndex = 0;
-            for (Song song : SongLoader.SONGS) {
-                if (empty || song.searchableFileName.contains(query) || song.searchableName.contains(query)) {
-                    song.entry.songListWidget = songListWidget;
-                    if (song.entry.favorite) {
-                        newEntries.add(favoriteIndex++, song.entry);
-                    } else {
-                        newEntries.add(song.entry);
+
+            if (currentFolder == null) {
+                for (SongLoader.SongFolder folder : SongLoader.FOLDERS) {
+                    if (empty || folder.name.toLowerCase().contains(query)) {
+                        if (folder.entry == null) {
+                            folder.entry = new SongListWidget.FolderEntry(folder, songListWidget);
+                        } else {
+                            folder.entry.songListWidget = songListWidget;
+                        }
+                        newEntries.add(folder.entry);
+                    }
+                }
+            } else {
+                SongListWidget.FolderEntry parentEntry = new SongListWidget.FolderEntry(null, songListWidget);
+                parentEntry.displayName = "..";
+                newEntries.add(parentEntry);
+
+                for (SongLoader.SongFolder subFolder : currentFolder.subFolders) {
+                    if (empty || subFolder.name.toLowerCase().contains(query)) {
+                        if (subFolder.entry == null) {
+                            subFolder.entry = new SongListWidget.FolderEntry(subFolder, songListWidget);
+                        } else {
+                            subFolder.entry.songListWidget = songListWidget;
+                        }
+                        newEntries.add(subFolder.entry);
                     }
                 }
             }
+
+            java.util.List<Song> songsToShow = currentFolder == null ?
+                    SongLoader.SONGS.stream()
+                            .filter(song -> song.folder == null)
+                            .collect(Collectors.toList()) :
+                    currentFolder.songs.stream()
+                            .filter(song -> song.folder == currentFolder)
+                            .collect(Collectors.toList());
+
+            for (Song song : songsToShow) {
+                if (song.entry.favorite && (empty || song.searchableFileName.contains(query) || song.searchableName.contains(query))) {
+                    song.entry.songListWidget = songListWidget;
+                    newEntries.add(song.entry);
+                }
+            }
+
+            for (Song song : songsToShow) {
+                if (!song.entry.favorite && (empty || song.searchableFileName.contains(query) || song.searchableName.contains(query))) {
+                    song.entry.songListWidget = songListWidget;
+                    newEntries.add(song.entry);
+                }
+            }
+
             songListWidget.safeReplaceEntries(newEntries);
+
+            for (SongListWidget.Entry entry : newEntries) {
+                entry.setSelected(false);
+            }
+
+            Song selectedSong = null;
+            for (Song song : songsToShow) {
+                if (song.entry.selected) {
+                    selectedSong = song;
+                    break;
+                }
+            }
+
+            if (Main.config.autoScrollToLastSelected && selectedSong == null && !Main.config.lastSelectedSong.isEmpty()) {
+                for (Song song : songsToShow) {
+                    if (song.fileName.equals(Main.config.lastSelectedSong)) {
+                        selectedSong = song;
+                        break;
+                    }
+                }
+            }
+
+            if (selectedSong != null) {
+                songListWidget.setSelected(selectedSong.entry);
+                if (Main.config.autoScrollToLastSelected) {
+                    int entryIndex = newEntries.indexOf(selectedSong.entry);
+                    if (entryIndex >= 0) {
+                        double scrollAmount = entryIndex * songListWidget.getItemHeight();
+                        songListWidget.setScrollAmount(scrollAmount);
+                    }
+                }
+            }
         }
+    }
+
+    public SongLoader.SongFolder findParentFolder(SongLoader.SongFolder folder) {
+        if (folder == null) return null;
+
+        if (SongLoader.FOLDERS.contains(folder)) {
+            return null;
+        }
+
+        for (SongLoader.SongFolder rootFolder : SongLoader.FOLDERS) {
+            if (rootFolder.subFolders.contains(folder)) {
+                return rootFolder;
+            }
+            SongLoader.SongFolder found = findParentInSubfolders(rootFolder, folder);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private SongLoader.SongFolder findParentInSubfolders(SongLoader.SongFolder parent, SongLoader.SongFolder target) {
+        for (SongLoader.SongFolder subFolder : parent.subFolders) {
+            if (subFolder == target) {
+                return parent;
+            }
+            SongLoader.SongFolder found = findParentInSubfolders(subFolder, target);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -260,7 +372,10 @@ public class DiscJockeyScreen extends Screen {
 
                         Song song = SongLoader.loadSong(file);
                         if (song != null) {
-                            Files.copy(path, Main.songsFolder.toPath().resolve(file.getName()));
+                            File destFile = Main.songsFolder.toPath().resolve(file.getName()).toFile();
+                            Files.copy(path, destFile.toPath());
+                            song.filePath = destFile.getPath();
+                            song.folder = null;
                             SongLoader.SONGS.add(song);
                         }
                     } catch (IOException exception) {

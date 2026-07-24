@@ -82,5 +82,8 @@
   "text.autoconfig.disc_jockey.option.enableExperimentalMIDI": "Enable Experimental MIDI",
   "text.autoconfig.disc_jockey.option.enableExperimentalMIDI.@Tooltip[0]": "Fhax3 added automatic recognition and conversion of MIDI music in v1.9.2-34f5536.",
   "text.autoconfig.disc_jockey.option.enableExperimentalMIDI.@Tooltip[1]": "This change takes effect after reloading all songs",
+  "text.autoconfig.disc_jockey.option.autoScrollToLastSelected": "Auto Scroll to Last Selected",
+  "text.autoconfig.disc_jockey.option.autoScrollToLastSelected.@Tooltip[0]": "Automatically scroll to the last selected song when opening the menu.",
+  "text.autoconfig.disc_jockey.option.autoScrollToLastSelected.@Tooltip[1]": "Also auto-navigate to the folder containing the last selected song.",
   "modmenu.descriptionTranslation.disc_jockey": "Play note block songs in Minecraft"
 }

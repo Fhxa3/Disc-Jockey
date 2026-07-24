@@ -105,7 +105,13 @@ public class Config implements ConfigData {
     @ConfigEntry.Gui.Tooltip(count = 2)
     public boolean enableExperimentalMIDI = false;
 
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public boolean autoScrollToLastSelected = true;
+
     @ConfigEntry.Gui.Excluded
     public ArrayList<String> favorites = new ArrayList<>();
+
+    @ConfigEntry.Gui.Excluded
+    public String lastSelectedSong = "";
 
 }
