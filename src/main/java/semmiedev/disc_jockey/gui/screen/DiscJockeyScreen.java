@@ -61,16 +61,9 @@ public class DiscJockeyScreen extends Screen {
     protected void init() {
         shouldFilter = true;
 
-        if (!Main.config.autoScrollToLastSelected) {
-            for (Song song : SongLoader.SONGS) {
-                if (song.entry != null) {
-                    song.entry.setSelected(false);
-                }
-            }
-            if (!Main.config.lastSelectedSong.isEmpty()) {
-                Main.config.lastSelectedSong = "";
-                Main.configHolder.save();
-            }
+        if (!Main.config.autoScrollToLastSelected && !Main.config.lastSelectedSong.isEmpty()) {
+            Main.config.lastSelectedSong = "";
+            Main.configHolder.save();
         }
 
         if (Main.config.autoScrollToLastSelected && !Main.config.lastSelectedSong.isEmpty()) {
@@ -289,6 +282,16 @@ public class DiscJockeyScreen extends Screen {
                 }
             }
 
+            SongListWidget.SongEntry previouslySelectedEntry = songListWidget.getSelectedSongOrNull();
+
+            Song selectedSongFromState = null;
+            for (Song song : songsToShow) {
+                if (song.entry.selected) {
+                    selectedSongFromState = song;
+                    break;
+                }
+            }
+
             songListWidget.safeReplaceEntries(newEntries);
 
             for (SongListWidget.Entry entry : newEntries) {
@@ -296,14 +299,20 @@ public class DiscJockeyScreen extends Screen {
             }
 
             Song selectedSong = null;
-            for (Song song : songsToShow) {
-                if (song.entry.selected) {
-                    selectedSong = song;
-                    break;
+            if (previouslySelectedEntry != null) {
+                for (Song song : songsToShow) {
+                    if (song == previouslySelectedEntry.song) {
+                        selectedSong = song;
+                        break;
+                    }
                 }
             }
 
-            if (Main.config.autoScrollToLastSelected && selectedSong == null && !Main.config.lastSelectedSong.isEmpty()) {
+            if (selectedSong == null && selectedSongFromState != null) {
+                selectedSong = selectedSongFromState;
+            }
+
+            if (selectedSong == null && Main.config.autoScrollToLastSelected && !Main.config.lastSelectedSong.isEmpty()) {
                 for (Song song : songsToShow) {
                     if (song.fileName.equals(Main.config.lastSelectedSong)) {
                         selectedSong = song;
@@ -313,13 +322,17 @@ public class DiscJockeyScreen extends Screen {
             }
 
             if (selectedSong != null) {
-                songListWidget.setSelected(selectedSong.entry);
                 if (Main.config.autoScrollToLastSelected) {
+                    songListWidget.setSelected(selectedSong.entry);
                     int entryIndex = newEntries.indexOf(selectedSong.entry);
                     if (entryIndex >= 0) {
                         double scrollAmount = entryIndex * songListWidget.getItemHeight();
                         songListWidget.setScrollAmount(scrollAmount);
                     }
+                } else {
+                    double currentScroll = songListWidget.scrollAmount();
+                    songListWidget.setSelected(selectedSong.entry);
+                    songListWidget.setScrollAmount(currentScroll);
                 }
             }
         }
