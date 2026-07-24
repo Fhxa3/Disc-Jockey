@@ -11,7 +11,7 @@ base {
 }
 
 repositories {
-    maven { url "https://maven.shedaniel.me/" }
+    maven { url = "https://maven.shedaniel.me/" }
     exclusiveContent {
         forRepository {
             maven {
@@ -42,12 +42,14 @@ dependencies {
     implementation("maven.modrinth:modmenu:${project.modmenu_version}")
 }
 
+def modVersion = project.version
+
 processResources {
-    inputs.property "version", project.version
-    filteringCharset "UTF-8"
+    inputs.property "version", modVersion
+    filteringCharset = "UTF-8"
 
     filesMatching("fabric.mod.json") {
-        expand "version": project.version
+        expand(["version": modVersion])
     }
 }
 
@@ -69,8 +71,8 @@ jar {
 // configure the maven publication
 publishing {
     publications {
-        mavenJava(MavenPublication) {
-            artifactId project.archives_base_name
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archives_base_name
             from components.java
         }
     }
