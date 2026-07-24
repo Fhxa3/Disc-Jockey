@@ -52,6 +52,7 @@ public class DiscJockeyScreen extends Screen {
     public boolean shouldFilter;
     private String query = "";
     public SongLoader.SongFolder currentFolder = null;
+    private boolean hasAutoScrolled = false;
 
     public DiscJockeyScreen() {
         super(Main.NAME);
@@ -60,6 +61,8 @@ public class DiscJockeyScreen extends Screen {
     @Override
     protected void init() {
         shouldFilter = true;
+        currentFolder = null;
+        hasAutoScrolled = false;
 
         if (!Main.config.autoScrollToLastSelected && !Main.config.lastSelectedSong.isEmpty()) {
             Main.config.lastSelectedSong = "";
@@ -68,14 +71,18 @@ public class DiscJockeyScreen extends Screen {
 
         if (Main.config.autoScrollToLastSelected && !Main.config.lastSelectedSong.isEmpty()) {
             for (Song song : SongLoader.SONGS) {
-                if (song.fileName.equals(Main.config.lastSelectedSong) && song.folder != null) {
-                    currentFolder = song.folder;
+                if (song.filePath.equals(Main.config.lastSelectedSong)) {
+                    if (song.folder != null) {
+                        SongLoader.SongFolder parent = findParentFolder(song.folder);
+                        if (parent != null || SongLoader.FOLDERS.contains(song.folder)) {
+                            currentFolder = song.folder;
+                        }
+                    }
                     break;
                 }
             }
         }
 
-        SongLoader.currentFolder = currentFolder;
         songListWidget = new SongListWidget(minecraft, width / 2 - 10, height - 64 - 32, 32, 20, this);
         songListWidget.setX(width / 2);
         addRenderableWidget(songListWidget);
@@ -314,7 +321,7 @@ public class DiscJockeyScreen extends Screen {
 
             if (selectedSong == null && Main.config.autoScrollToLastSelected && !Main.config.lastSelectedSong.isEmpty()) {
                 for (Song song : songsToShow) {
-                    if (song.fileName.equals(Main.config.lastSelectedSong)) {
+                    if (song.filePath.equals(Main.config.lastSelectedSong)) {
                         selectedSong = song;
                         break;
                     }
@@ -322,11 +329,14 @@ public class DiscJockeyScreen extends Screen {
             }
 
             if (selectedSong != null) {
-                if (Main.config.autoScrollToLastSelected) {
+                if (Main.config.autoScrollToLastSelected && !hasAutoScrolled) {
+                    hasAutoScrolled = true;
                     songListWidget.setSelected(selectedSong.entry);
                     int entryIndex = newEntries.indexOf(selectedSong.entry);
                     if (entryIndex >= 0) {
-                        double scrollAmount = entryIndex * songListWidget.getItemHeight();
+                        double itemHeight = songListWidget.getItemHeight();
+                        double scrollAmount = entryIndex * itemHeight - (songListWidget.getHeight() - itemHeight) / 2.0;
+                        if (scrollAmount < 0) scrollAmount = 0;
                         songListWidget.setScrollAmount(scrollAmount);
                     }
                 } else {

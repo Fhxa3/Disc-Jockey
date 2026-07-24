@@ -159,7 +159,7 @@ public class SongListWidget extends AbstractSelectionList<SongListWidget.Entry> 
                 Main.SONG_PLAYER.start(this.song);
             } else {
                 songListWidget.setSelected(this);
-                Main.config.lastSelectedSong = song.fileName;
+                Main.config.lastSelectedSong = song.filePath;
                 lastClickedAt = Util.now();
             }
             return true;
@@ -233,15 +233,13 @@ public class SongListWidget extends AbstractSelectionList<SongListWidget.Entry> 
             if (button == 0) {
                 if (songListWidget.getParentScreen() instanceof DiscJockeyScreen screen) {
                     if (this.folder == null) {
-                        SongFolder parent = screen.findParentFolder(SongLoader.currentFolder);
-                        if (parent != null || SongLoader.FOLDERS.contains(SongLoader.currentFolder)) {
+                        SongFolder parent = screen.findParentFolder(screen.currentFolder);
+                        if (parent != null || SongLoader.FOLDERS.contains(screen.currentFolder)) {
                             screen.currentFolder = parent;
-                            SongLoader.currentFolder = parent;
                             screen.shouldFilter = true;
                         }
                     } else {
                         screen.currentFolder = this.folder;
-                        SongLoader.currentFolder = this.folder;
                         screen.shouldFilter = true;
                     }
                     songListWidget.setSelected(this);

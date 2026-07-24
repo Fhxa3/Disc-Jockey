@@ -18,7 +18,6 @@ public class SongLoader {
     public static final ArrayList<String> SONG_SUGGESTIONS = new ArrayList<>();
     public static volatile boolean loadingSongs;
     public static volatile boolean showToast;
-    public static SongFolder currentFolder = null;
 
     public static class SongFolder {
         public final String name;
