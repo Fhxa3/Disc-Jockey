@@ -9,19 +9,19 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.item.ItemStack;
+import org.jspecify.annotations.NonNull;
 import semmiedev.disc_jockey.*;
+import semmiedev.disc_jockey.gui.PreviewTimeSliderWidget;
 import semmiedev.disc_jockey.gui.SongListWidget;
 import semmiedev.disc_jockey.gui.SongTimeSliderWidget;
-import semmiedev.disc_jockey.gui.hud.BlocksOverlay;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
 
 public class DiscJockeyScreen extends Screen {
     private static final MutableComponent
@@ -37,15 +37,25 @@ public class DiscJockeyScreen extends Screen {
             SONGSTATE_STOPPED = Component.translatable(Main.MOD_ID+".screen.songstate.stopped").withStyle((style) -> style.withItalic(true).withColor(0xDDDDDD)),
             SONGSTATE_TUNING = Component.translatable(Main.MOD_ID+".screen.songstate.tuning").withStyle((style) -> style.withItalic(true).withColor(0xDDDDDD)),
             PLEASE_SELECT_SONG = Component.translatable(Main.MOD_ID+".screen.please_select_song").withStyle((style) -> style.withItalic(true)),
-            CONFIG = Component.translatable(Main.MOD_ID+".screen.config")
+            CONFIG = Component.translatable(Main.MOD_ID+".screen.config"),
+            MODE_SINGLE = Component.translatable(Main.MOD_ID+".screen.mode_single"),
+            MODE_LIST = Component.translatable(Main.MOD_ID+".screen.mode_list"),
+            MODE_RANDOM = Component.translatable(Main.MOD_ID+".screen.mode_random"),
+            MODE_STOP = Component.translatable(Main.MOD_ID+".screen.mode_stop"),
+            PLAYBACK_TITLE = Component.translatable(Main.MOD_ID+".screen.playback_title"),
+            PREVIEW_TITLE = Component.translatable(Main.MOD_ID+".screen.preview_title")
     ;
 
     private StringWidget songTitle;
     private StringWidget songState;
     private CycleButton<Boolean> playPauseButton;
-    private Button stopButton;
+    private Button playModeButton;
     private SongTimeSliderWidget timeBar;
-    private Button configButton;
+    private StringWidget previewTitle;
+    private StringWidget previewState;
+    private PreviewTimeSliderWidget previewTimeBar;
+    private CycleButton<Boolean> previewPlayButton;
+    private Button previewPlayModeButton;
 
     private SongListWidget songListWidget;
     private Button playButton, previewButton;
@@ -87,10 +97,9 @@ public class DiscJockeyScreen extends Screen {
         songListWidget.setX(width / 2);
         addRenderableWidget(songListWidget);
 
-        playButton = Button.builder(PLAY, button -> {
-            if (Main.SONG_PLAYER.running) {
-                Main.SONG_PLAYER.stop();
-            } else {
+        playButton = Button.builder(PLAY, _button -> {
+            if (Main.SONG_PLAYER.running) Main.SONG_PLAYER.stop();
+            else {
                 SongListWidget.SongEntry entry = songListWidget.getSelectedSongOrNull();
                 if (entry != null) {
                     Main.SONG_PLAYER.start(entry.song);
@@ -99,7 +108,7 @@ public class DiscJockeyScreen extends Screen {
         }).bounds((width / 4 * 3) - 160, height - 61, 100, 20).build();
         addRenderableWidget(playButton);
 
-        previewButton = Button.builder(PREVIEW, button -> {
+        previewButton = Button.builder(PREVIEW, _button -> {
             if (Main.PREVIEWER.running) {
                 Main.PREVIEWER.stop();
             } else {
@@ -109,41 +118,31 @@ public class DiscJockeyScreen extends Screen {
         }).bounds((width / 4 * 3) - 50, height - 61, 100, 20).build();
         addRenderableWidget(previewButton);
 
-        addRenderableWidget(Button.builder(Component.translatable(Main.MOD_ID+".screen.blocks"), button -> {
-            if (BlocksOverlay.itemStacks == null) {
-                SongListWidget.SongEntry entry = songListWidget.getSelectedSongOrNull();
-                if (entry != null) {
-                    minecraft.gui.setScreen(null);
-
-                    BlocksOverlay.itemStacks = new ItemStack[0];
-                    BlocksOverlay.amounts = new int[0];
-                    BlocksOverlay.amountOfNoteBlocks = entry.song.uniqueNotes.size();
-
-                    for (Note note : entry.song.uniqueNotes) {
-                        ItemStack itemStack = Note.INSTRUMENT_BLOCKS.get(note.instrument()).asItem().getDefaultInstance();
-                        int index = -1;
-
-                        for (int i = 0; i < BlocksOverlay.itemStacks.length; i++) {
-                            if (BlocksOverlay.itemStacks[i].getItem() == itemStack.getItem()) {
-                                index = i;
-                                break;
-                            }
-                        }
-
-                        if (index == -1) {
-                            BlocksOverlay.itemStacks = Arrays.copyOf(BlocksOverlay.itemStacks, BlocksOverlay.itemStacks.length + 1);
-                            BlocksOverlay.amounts = Arrays.copyOf(BlocksOverlay.amounts, BlocksOverlay.amounts.length + 1);
-
-                            BlocksOverlay.itemStacks[BlocksOverlay.itemStacks.length - 1] = itemStack;
-                            BlocksOverlay.amounts[BlocksOverlay.amounts.length - 1] = 1;
-                        } else {
-                            BlocksOverlay.amounts[index] = BlocksOverlay.amounts[index] + 1;
-                        }
-                    }
+        addRenderableWidget(Button.builder(Component.translatable(Main.MOD_ID+".screen.blocks"), _button -> {
+            SongListWidget.SongEntry entry = songListWidget.getSelectedSongOrNull();
+            if (entry != null) {
+                try {
+                    SongLoader.ensureSongLoaded(entry.song);
+                } catch (IOException e) {
+                    Main.LOGGER.error("Failed to load song for blocks overlay: {}", entry.song.fileName, e);
+                    return;
                 }
-            } else {
-                BlocksOverlay.itemStacks = null;
+
                 minecraft.gui.setScreen(null);
+
+                java.util.HashMap<net.minecraft.world.level.block.Block, Integer> blockCounts = new java.util.HashMap<>();
+                for (Note note : entry.song.uniqueNotes) {
+                    net.minecraft.world.level.block.Block block = Note.INSTRUMENT_BLOCKS.get(note.instrument());
+                    blockCounts.put(block, blockCounts.getOrDefault(block, 0) + 1);
+                }
+
+                minecraft.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID + ".screen.blocks.header").withStyle(ChatFormatting.YELLOW), null, net.minecraft.client.multiplayer.chat.GuiMessageSource.PLAYER, net.minecraft.client.multiplayer.chat.GuiMessageTag.chatError());
+                minecraft.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID + ".screen.blocks.song", entry.song.fileName), null, net.minecraft.client.multiplayer.chat.GuiMessageSource.PLAYER, net.minecraft.client.multiplayer.chat.GuiMessageTag.chatError());
+                minecraft.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID + ".screen.blocks.total", entry.song.uniqueNotes.size()), null, net.minecraft.client.multiplayer.chat.GuiMessageSource.PLAYER, net.minecraft.client.multiplayer.chat.GuiMessageTag.chatError());
+                
+                for (java.util.Map.Entry<net.minecraft.world.level.block.Block, Integer> entry2 : blockCounts.entrySet()) {
+                    minecraft.gui.hud.getChat().addMessage(Component.literal("  " + entry2.getKey().getName().getString() + " × " + entry2.getValue()).withStyle(ChatFormatting.GRAY), null, net.minecraft.client.multiplayer.chat.GuiMessageSource.PLAYER, net.minecraft.client.multiplayer.chat.GuiMessageTag.chatError());
+                }
             }
         }).bounds((width / 4 * 3) + 60, height - 61, 100, 20).build());
 
@@ -157,30 +156,121 @@ public class DiscJockeyScreen extends Screen {
         });
         addRenderableWidget(searchBar);
 
-        songState = new StringWidget(10, 32, width / 2 - 20, 20, Component.empty(), getFont());
+        int playbackY = 20;
+        addRenderableWidget(new StringWidget(10, playbackY, width / 2 - 20, 20, PLAYBACK_TITLE, getFont()));
+
+        songState = new StringWidget(10, playbackY + 20, width / 2 - 20, 20, Component.empty(), getFont());
         addRenderableWidget(songState);
-        songTitle = new StringWidget(10, 32 + 20, width / 2 - 20, 20, Component.empty(), getFont());
+        songTitle = new StringWidget(10, playbackY + 20 + 20, width / 2 - 20, 20, Component.empty(), getFont());
         addRenderableWidget(songTitle);
-        timeBar = new SongTimeSliderWidget(10, 32 + 20 + 20, width / 2 - 20, 30);
+        timeBar = new SongTimeSliderWidget(10, playbackY + 20 + 20 + 20, width / 2 - 20, 30);
         addRenderableWidget(timeBar);
-        playPauseButton = CycleButton.<Boolean>builder((value) -> Component.literal(value ? "⏸" : "▶"), Main.SONG_PLAYER.running)
+        int buttonY = playbackY + 20 + 20 + 20 + 30 + 5;
+
+        Button prevSongButton = Button.builder(Component.literal("⏮"), _button -> Main.SONG_PLAYER.playPrevSong())
+                .pos((width / 4) - 45, buttonY)
+                .size(20, 20)
+                .build();
+        addRenderableWidget(prevSongButton);
+
+        playPauseButton = CycleButton.builder((value) -> Component.literal(value ? "⏸" : "▶"), Main.SONG_PLAYER.running)
                 .displayOnlyValue()
                 .withValues(true, false)
-                .create((width / 4) - 25, 32 + 20 + 20 + 30 + 5, 20, 20, Component.empty(), (button, value) -> {
-            if (value && Main.SONG_PLAYER.song != null && Main.SONG_PLAYER.didSongReachEnd) {
-                Main.SONG_PLAYER.start(Main.SONG_PLAYER.song);
+                .create((width / 4) - 25, buttonY, 20, 20, Component.empty(), (_button, value) -> {
+            if (value) {
+                if (Main.SONG_PLAYER.song != null && Main.SONG_PLAYER.didSongReachEnd) {
+                    Main.SONG_PLAYER.start(Main.SONG_PLAYER.song);
+                } else if (Main.SONG_PLAYER.song != null) {
+                    Main.SONG_PLAYER.running = true;
+                }
             } else {
-                Main.SONG_PLAYER.running = value;
+                Main.SONG_PLAYER.running = false;
             }
         });
         addRenderableWidget(playPauseButton);
-        stopButton = Button.builder(Component.literal("⏹"), button -> Main.SONG_PLAYER.stop())
-                .pos((width / 4) + 5, 32 + 20 + 20 + 30 + 5)
+
+        Button nextSongButton = Button.builder(Component.literal("⏭"), _button -> Main.SONG_PLAYER.playNextSong())
+                .pos((width / 4) + 5, buttonY)
+                .size(20, 20)
+                .build();
+        addRenderableWidget(nextSongButton);
+
+        Button stopButton = Button.builder(Component.literal("⏹"), _button -> Main.SONG_PLAYER.stop())
+                .pos((width / 4) + 25, buttonY)
                 .size(20, 20)
                 .build();
         addRenderableWidget(stopButton);
 
-        configButton = Button.builder(CONFIG, (button) -> minecraft.gui.setScreen(AutoConfigClient.getConfigScreen(Config.class, this).get()))
+        playModeButton = Button.builder(getPlayModeText(), _button -> {
+            SongPlayer.PlayMode currentMode = Main.SONG_PLAYER.getPlayMode();
+            SongPlayer.PlayMode nextMode;
+            switch (currentMode) {
+                case SINGLE_LOOP -> nextMode = SongPlayer.PlayMode.LIST_LOOP;
+                case LIST_LOOP -> nextMode = SongPlayer.PlayMode.RANDOM;
+                case RANDOM -> nextMode = SongPlayer.PlayMode.STOP_AFTER;
+                case STOP_AFTER -> nextMode = SongPlayer.PlayMode.SINGLE_LOOP;
+                default -> nextMode = SongPlayer.PlayMode.STOP_AFTER;
+            }
+            Main.SONG_PLAYER.setPlayMode(nextMode);
+            playModeButton.setMessage(getPlayModeText());
+        }).pos((width / 4) + 50, buttonY)
+                .size(60, 20)
+                .build();
+        addRenderableWidget(playModeButton);
+
+        int previewY = playbackY + 20 + 20 + 20 + 30 + 5 + 20 + 10;
+        addRenderableWidget(new StringWidget(10, previewY, width / 2 - 20, 20, PREVIEW_TITLE, getFont()));
+
+        previewState = new StringWidget(10, previewY + 20, width / 2 - 20, 20, Component.empty(), getFont());
+        addRenderableWidget(previewState);
+        previewTitle = new StringWidget(10, previewY + 20 + 20, width / 2 - 20, 20, Component.empty(), getFont());
+        addRenderableWidget(previewTitle);
+        previewTimeBar = new PreviewTimeSliderWidget(10, previewY + 20 + 20 + 20, width / 2 - 20, 30);
+        addRenderableWidget(previewTimeBar);
+        int previewButtonY = previewY + 20 + 20 + 20 + 30 + 5;
+
+        Button previewPrevButton = Button.builder(Component.literal("⏮"), _button -> Main.PREVIEWER.playPrevSong())
+                .pos((width / 4) - 45, previewButtonY)
+                .size(20, 20)
+                .build();
+        addRenderableWidget(previewPrevButton);
+
+        previewPlayButton = CycleButton.builder((value) -> Component.literal(value ? "⏸" : "▶"), Main.PREVIEWER.running)
+                .displayOnlyValue()
+                .withValues(true, false)
+                .create((width / 4) - 25, previewButtonY, 20, 20, Component.empty(), (_button, value) -> Main.PREVIEWER.running = value && Main.PREVIEWER.getSong() != null);
+        addRenderableWidget(previewPlayButton);
+
+        Button previewNextButton = Button.builder(Component.literal("⏭"), _button -> Main.PREVIEWER.playNextSong())
+                .pos((width / 4) + 5, previewButtonY)
+                .size(20, 20)
+                .build();
+        addRenderableWidget(previewNextButton);
+
+        Button previewStopButton = Button.builder(Component.literal("⏹"), _button -> Main.PREVIEWER.stop())
+                .pos((width / 4) + 25, previewButtonY)
+                .size(20, 20)
+                .build();
+        addRenderableWidget(previewStopButton);
+
+        previewPlayModeButton = Button.builder(getPreviewPlayModeText(), _button -> {
+            Previewer.PlayMode currentMode = Main.PREVIEWER.getPlayMode();
+            Previewer.PlayMode nextMode;
+            switch (currentMode) {
+                case SINGLE_LOOP -> nextMode = Previewer.PlayMode.LIST_LOOP;
+                case LIST_LOOP -> nextMode = Previewer.PlayMode.RANDOM;
+                case RANDOM -> nextMode = Previewer.PlayMode.STOP_AFTER;
+                case STOP_AFTER -> nextMode = Previewer.PlayMode.SINGLE_LOOP;
+                default -> nextMode = Previewer.PlayMode.STOP_AFTER;
+            }
+            Main.PREVIEWER.setPlayMode(nextMode);
+            previewPlayModeButton.setMessage(getPreviewPlayModeText());
+        }).pos((width / 4) + 50, previewButtonY)
+                .size(60, 20)
+                .build();
+        addRenderableWidget(previewPlayModeButton);
+
+        Button configButton = Button.builder(CONFIG, (_button) -> minecraft.gui.setScreen(AutoConfigClient.getConfigScreen(Config.class, this).get()))
                 .pos(10, height - 30)
                 .size(100, 20)
                 .build();
@@ -209,14 +299,43 @@ public class DiscJockeyScreen extends Screen {
         }
     }
 
-    @Override
-    public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        super.extractBackground(context, mouseX, mouseY, delta);
-        context.blit(RenderPipelines.GUI_TEXTURED, AbstractSelectionList.INWORLD_MENU_LIST_BACKGROUND, 5, 32, width / 2, 32 + 20 + 20 + 30 + 5 + 20 + 5, this.width / 2 - 10, 20 + 20 + 30 + 5 + 20 + 5, 32, 32);
+    private static Component getPreviewStateText() {
+        boolean running = Main.PREVIEWER.running;
+        if (!running) {
+            if (Main.PREVIEWER.getSongElapsedSeconds() == 0.0) {
+                return SONGSTATE_STOPPED;
+            } else {
+                return SONGSTATE_PAUSED;
+            }
+        } else {
+            return SONGSTATE_PLAYING;
+        }
+    }
+
+    private Component getPreviewPlayModeText() {
+        return switch (Main.PREVIEWER.getPlayMode()) {
+            case SINGLE_LOOP -> MODE_SINGLE;
+            case LIST_LOOP -> MODE_LIST;
+            case RANDOM -> MODE_RANDOM;
+            case STOP_AFTER -> MODE_STOP;
+        };
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    public void extractBackground(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractBackground(context, mouseX, mouseY, delta);
+        int playbackY = 20;
+        int playbackHeight = 20 + 20 + 20 + 30 + 5 + 20 + 5;
+        int halfWidth = width / 2;
+        context.blit(RenderPipelines.GUI_TEXTURED, AbstractSelectionList.INWORLD_MENU_LIST_BACKGROUND, 5, playbackY, halfWidth, playbackY + playbackHeight, halfWidth - 10, playbackHeight, 32, 32);
+
+        int previewY = playbackY + playbackHeight + 10;
+        int previewHeight = 20 + 20 + 20 + 30 + 5 + 20 + 5;
+        context.blit(RenderPipelines.GUI_TEXTURED, AbstractSelectionList.INWORLD_MENU_LIST_BACKGROUND, 5, previewY, halfWidth, previewY + previewHeight, halfWidth - 10, previewHeight, 32, 32);
+    }
+
+    @Override
+    public void extractRenderState(@NonNull GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         super.extractRenderState(context, mouseX, mouseY, delta);
 
         context.text(font, DROP_HINT, width / 2, 5, 0xFFFFFF);
@@ -227,8 +346,13 @@ public class DiscJockeyScreen extends Screen {
     public void tick() {
         songState.setMessage(getPlaybackStateText());
         timeBar.update();
-        playPauseButton.setValue(Main.SONG_PLAYER.running);
+        playPauseButton.setValue(Main.SONG_PLAYER.song != null && Main.SONG_PLAYER.running);
         songTitle.setMessage(Main.SONG_PLAYER.song != null ? Component.literal(Main.SONG_PLAYER.song.displayName) : PLEASE_SELECT_SONG);
+
+        previewState.setMessage(getPreviewStateText());
+        previewTimeBar.update();
+        previewPlayButton.setValue(Main.PREVIEWER.getSong() != null && Main.PREVIEWER.running);
+        previewTitle.setMessage(Main.PREVIEWER.getSong() != null ? Component.literal(Main.PREVIEWER.getSong().displayName) : PLEASE_SELECT_SONG);
 
         previewButton.setMessage(Main.PREVIEWER.running ? PREVIEW_STOP : PREVIEW);
         playButton.setMessage(Main.SONG_PLAYER.running ? PLAY_STOP : PLAY);
@@ -270,10 +394,10 @@ public class DiscJockeyScreen extends Screen {
             java.util.List<Song> songsToShow = currentFolder == null ?
                     SongLoader.SONGS.stream()
                             .filter(song -> song.folder == null)
-                            .collect(Collectors.toList()) :
+                            .toList() :
                     currentFolder.songs.stream()
                             .filter(song -> song.folder == currentFolder)
-                            .collect(Collectors.toList());
+                            .toList();
 
             for (Song song : songsToShow) {
                 if (song.entry.favorite && (empty || song.searchableFileName.contains(query) || song.searchableName.contains(query))) {
@@ -382,7 +506,7 @@ public class DiscJockeyScreen extends Screen {
 
     @Override
     public void onFilesDrop(List<Path> paths) {
-        String string = paths.stream().map(Path::getFileName).map(Path::toString).collect(Collectors.joining(", "));
+        String string = paths.stream().map(Path::getFileName).map(Path::toString).collect(joining(", "));
         if (string.length() > 300) string = string.substring(0, 300)+"...";
 
         minecraft.gui.setScreen(new ConfirmScreen(confirmed -> {
@@ -421,5 +545,14 @@ public class DiscJockeyScreen extends Screen {
     public void onClose() {
         super.onClose();
         new Thread(() -> Main.configHolder.save()).start();
+    }
+
+    private Component getPlayModeText() {
+        return switch (Main.SONG_PLAYER.getPlayMode()) {
+            case SINGLE_LOOP -> MODE_SINGLE;
+            case LIST_LOOP -> MODE_LIST;
+            case RANDOM -> MODE_RANDOM;
+            case STOP_AFTER -> MODE_STOP;
+        };
     }
 }

@@ -5,9 +5,11 @@ import me.shedaniel.autoconfig.AutoConfig;
 import me.shedaniel.autoconfig.ConfigHolder;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientLoginConnectionEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
@@ -16,11 +18,13 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.chat.GuiMessageSource;
 import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MessageSignature;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
+import semmiedev.disc_jockey.gui.hud.PlaybackProgressOverlay;
 import semmiedev.disc_jockey.gui.screen.DiscJockeyScreen;
 
 import java.io.File;
@@ -43,10 +47,19 @@ public class Main implements ClientModInitializer {
         configHolder = AutoConfig.register(Config.class, CustomConfigSerializer::new);
         config = configHolder.getConfig();
 
+        ClientLifecycleEvents.CLIENT_STOPPING.register(_ -> {
+            if (!config.rememberLastSelectedOnRestart && !config.lastSelectedSong.isEmpty()) {
+                config.lastSelectedSong = "";
+                configHolder.save();
+            }
+        });
+
         
 
         songsFolder = new File(FabricLoader.getInstance().getConfigDir()+File.separator+MOD_ID+File.separator+"songs");
-        if (!songsFolder.isDirectory()) songsFolder.mkdirs();
+        if (!songsFolder.isDirectory() && !songsFolder.mkdirs()) {
+            LOGGER.warn("Failed to create songs folder: {}", songsFolder.getAbsolutePath());
+        }
 
         SongLoader.loadSongs();
 
@@ -63,7 +76,8 @@ public class Main implements ClientModInitializer {
             private ClientLevel prevWorld;
 
             @Override
-            public void onStartTick(Minecraft client) {
+            public void onStartTick(@Nullable Minecraft client) {
+                if (client == null) return;
                 if (prevWorld != client.level) {
                     PREVIEWER.stop();
                     SONG_PLAYER.stop();
@@ -73,7 +87,7 @@ public class Main implements ClientModInitializer {
                 if (openScreenKeyBind.consumeClick()) {
                     if (SongLoader.loadingSongs) {
 //                        client.gui.getChat().addMessage(Component.translatable(Main.MOD_ID+".still_loading").withStyle(ChatFormatting.RED));
-                        client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".still_loading").withStyle(ChatFormatting.RED), (MessageSignature) null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+                        client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".still_loading").withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
                         SongLoader.showToast = true;
                     } else {
                         client.gui.setScreen(new DiscJockeyScreen());
@@ -83,18 +97,16 @@ public class Main implements ClientModInitializer {
         });
 
         ClientTickEvents.START_LEVEL_TICK.register(world -> {
-            for (ClientTickEvents.StartLevelTick listener : TICK_LISTENERS) listener.onStartTick(world);
+            for (ClientTickEvents.StartLevelTick listener : new java.util.ArrayList<>(TICK_LISTENERS)) listener.onStartTick(world);
         });
 
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            DiscjockeyCommand.register(dispatcher);
-        });
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, _) -> DiscjockeyCommand.register(dispatcher));
 
-        ClientLoginConnectionEvents.DISCONNECT.register((handler, client) -> {
+        ClientLoginConnectionEvents.DISCONNECT.register((_, _) -> {
             PREVIEWER.stop();
             SONG_PLAYER.stop();
         });
 
-        // HudRenderCallback.EVENT.register(BlocksOverlay::extractContent);
+        HudElementRegistry.addLast(Identifier.withDefaultNamespace(Main.MOD_ID + "/" + "playback_progress"), new PlaybackProgressOverlay());
     }
 }

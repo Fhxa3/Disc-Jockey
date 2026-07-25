@@ -6,6 +6,9 @@
   "disc_jockey.screen.preview.stop": "Stop Previewing",
   "disc_jockey.screen.blocks.title": "Blocks",
   "disc_jockey.screen.blocks": "Blocks",
+  "disc_jockey.screen.blocks.header": "=== Required Note Blocks ===",
+  "disc_jockey.screen.blocks.song": "Song: %s",
+  "disc_jockey.screen.blocks.total": "Total note blocks needed: %s",
   "disc_jockey.screen.search": "Search For Songs",
   "disc_jockey.screen.drop_hint": "Drag and drop song files into this window to add them",
   "disc_jockey.screen.drop_confirm": "Do you want to add the following songs to Disc Jockey?",
@@ -85,5 +88,13 @@
   "text.autoconfig.disc_jockey.option.autoScrollToLastSelected": "Auto Scroll to Last Selected",
   "text.autoconfig.disc_jockey.option.autoScrollToLastSelected.@Tooltip[0]": "Automatically scroll to the last selected song when opening the menu.",
   "text.autoconfig.disc_jockey.option.autoScrollToLastSelected.@Tooltip[1]": "Also auto-navigate to the folder containing the last selected song.",
+  "text.autoconfig.disc_jockey.option.rememberLastSelectedOnRestart": "Remember Last Selected on Restart",
+  "text.autoconfig.disc_jockey.option.rememberLastSelectedOnRestart.@Tooltip": "Remember the last selected song when restarting the game.",
+  "disc_jockey.screen.mode_single": "🔂SINGLE LOOP",
+  "disc_jockey.screen.mode_list": "🔁LIST LOOP",
+  "disc_jockey.screen.mode_random": "🔀RANDOM",
+  "disc_jockey.screen.mode_stop": "⏹STOP AFTER",
+  "disc_jockey.screen.playback_title": "Playback Status",
+  "disc_jockey.screen.preview_title": "Preview Status",
   "modmenu.descriptionTranslation.disc_jockey": "Play note block songs in Minecraft"
 }

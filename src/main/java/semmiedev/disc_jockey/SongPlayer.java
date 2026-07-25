@@ -10,7 +10,6 @@ import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MessageSignature;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.util.Mth;
@@ -20,6 +19,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
+import java.util.Objects;
 
 public class SongPlayer implements ClientTickEvents.StartLevelTick {
     private static boolean warned;
@@ -32,10 +32,21 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
     // The thread executing the tickPlayback method
     private Thread playbackThread = null;
     public long playbackLoopDelay = 5;
+    private final Object playbackLock = new Object();
     // Just for external debugging purposes
     public float speed = 1.0f;
     public boolean didSongReachEnd = false;
     public boolean loopSong = false;
+
+    public enum PlayMode {
+        SINGLE_LOOP,
+        LIST_LOOP,
+        RANDOM,
+        STOP_AFTER
+    }
+
+    private PlayMode playMode = PlayMode.STOP_AFTER;
+    private int randomIndex = -1;
     private final RateLimiter rateLimiter = new RateLimiter();
     public final Tuner tuner = new Tuner();
 
@@ -50,25 +61,28 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
         }
 
         this.playbackThread = new Thread(() -> {
-            Thread ownThread = this.playbackThread;
-            while (ownThread == this.playbackThread) {
-                try {
-                    // Accuracy doesn't really matter at this precision imo
-                    Thread.sleep(playbackLoopDelay);
-                } catch (InterruptedException ignored) {}
+            while (true) {
                 tickPlayback();
+                synchronized (playbackLock) {
+                    try {
+                        playbackLock.wait(playbackLoopDelay);
+                    } catch (InterruptedException ignored) {}
+                }
             }
         });
         this.playbackThread.start();
     }
 
     public synchronized void stopPlaybackThread() {
-        this.playbackThread = null; // Should stop on its own then
+        this.playbackThread = null;
+        synchronized (playbackLock) {
+            playbackLock.notify();
+        }
     }
 
     public synchronized void start(Song song) {
         if (!Main.config.hideWarning && !warned) {
-            Minecraft.getInstance().gui.hud.getChat().addMessage(Component.translatable("disc_jockey.warning").withStyle(ChatFormatting.BOLD, ChatFormatting.RED), (MessageSignature)null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+            Minecraft.getInstance().gui.hud.getChat().addMessage(Component.translatable("disc_jockey.warning").withStyle(ChatFormatting.BOLD, ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
             warned = true;
             return;
         }
@@ -90,6 +104,9 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
         rateLimiter.reset();
         tuner.reset();
         didSongReachEnd = false;
+        if (playMode == PlayMode.RANDOM) {
+            randomIndex = getRandomSongIndex(song.folder);
+        }
     }
 
     public synchronized void stop() {
@@ -100,6 +117,78 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
         rateLimiter.reset();
         tuner.reset();
         didSongReachEnd = false; // Change after running stop() if actually ended cleanly
+        song = null;
+    }
+
+    public synchronized void setPlayMode(PlayMode mode) {
+        this.playMode = mode;
+        this.loopSong = mode == PlayMode.SINGLE_LOOP;
+    }
+
+    public PlayMode getPlayMode() {
+        return playMode;
+    }
+
+    private int getRandomSongIndex(SongLoader.SongFolder folder) {
+        if (folder == null) {
+            return SongLoader.SONGS.stream()
+                    .filter(s -> s.folder == null)
+                    .map(SongLoader.SONGS::indexOf)
+                    .skip((long) (Math.random() * SongLoader.SONGS.stream().filter(s -> s.folder == null).count()))
+                    .findFirst()
+                    .orElse(0);
+        } else {
+            return (int) (Math.random() * folder.songs.size());
+        }
+    }
+
+    public synchronized void playNextSong() {
+        SongLoader.SongFolder folder = song != null ? song.folder : null;
+        if (folder == null) {
+            var mainSongs = SongLoader.SONGS.stream().filter(s -> s.folder == null).toList();
+            if (mainSongs.isEmpty()) return;
+            int currentIndex = mainSongs.indexOf(song);
+            if (currentIndex == -1) return;
+            int nextIndex = (currentIndex + 1) % mainSongs.size();
+            start(mainSongs.get(nextIndex));
+        } else {
+            int currentIndex = folder.songs.indexOf(song);
+            if (currentIndex == -1) return;
+            int nextIndex = (currentIndex + 1) % folder.songs.size();
+            start(folder.songs.get(nextIndex));
+        }
+    }
+
+    public synchronized void playNextRandomSong() {
+        SongLoader.SongFolder folder = song != null ? song.folder : null;
+        randomIndex = getRandomSongIndex(folder);
+        if (folder == null) {
+            var mainSongs = SongLoader.SONGS.stream().filter(s -> s.folder == null).toList();
+            if (!mainSongs.isEmpty()) {
+                start(mainSongs.get(randomIndex));
+            }
+        } else {
+            if (!folder.songs.isEmpty()) {
+                start(folder.songs.get(randomIndex));
+            }
+        }
+    }
+
+    public synchronized void playPrevSong() {
+        SongLoader.SongFolder folder = song != null ? song.folder : null;
+        if (folder == null) {
+            var mainSongs = SongLoader.SONGS.stream().filter(s -> s.folder == null).toList();
+            if (mainSongs.isEmpty()) return;
+            int currentIndex = mainSongs.indexOf(song);
+            if (currentIndex == -1) return;
+            int prevIndex = (currentIndex - 1 + mainSongs.size()) % mainSongs.size();
+            start(mainSongs.get(prevIndex));
+        } else {
+            int currentIndex = folder.songs.indexOf(song);
+            if (currentIndex == -1) return;
+            int prevIndex = (currentIndex - 1 + folder.songs.size()) % folder.songs.size();
+            start(folder.songs.get(prevIndex));
+        }
     }
 
     /**
@@ -122,7 +211,7 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
             GameType gameMode = client.gameMode == null ? null : client.gameMode.getPlayerMode();
             // In the best case, gameMode would only be queried in sync Ticks, no here
             if (gameMode == null || !gameMode.isSurvival()) {
-                client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".player.invalid_game_mode", gameMode == null ? "unknown" : gameMode.getLongDisplayName()).withStyle(ChatFormatting.RED), (MessageSignature)null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+                client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".player.invalid_game_mode", gameMode == null ? "unknown" : gameMode.getLongDisplayName()).withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
                 stop();
                 return;
             }
@@ -135,7 +224,7 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
                     index++;
                     continue;
                 }
-                @Nullable BlockPos blockPos = instrumentMap.get((byte)(note >> Note.NOTE_SHIFT));
+                BlockPos blockPos = instrumentMap.get((byte)(note >> Note.NOTE_SHIFT));
                 if(blockPos == null) {
                     // Instrument got likely mapped to "nothing". Skip it
                     index++;
@@ -143,12 +232,12 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
                 }
                 if (!Util.canInteractWith(client.player, blockPos)) {
                     stop();
-                    client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".player.too_far").withStyle(ChatFormatting.RED), (MessageSignature)null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+                    client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".player.too_far").withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
                     return;
                 }
                 Vec3 unit = Vec3.upFromBottomCenterOf(blockPos, 0.5).subtract(client.player.getEyePosition()).normalize();
                 if (rateLimiter.canSendLookPacket()) {
-                    client.getConnection().send(new ServerboundMovePlayerPacket.Rot(Mth.wrapDegrees((float) (Mth.atan2(unit.z, unit.x) * 57.2957763671875) - 90.0f), Mth.wrapDegrees((float) (-(Mth.atan2(unit.y, Math.sqrt(unit.x * unit.x + unit.z * unit.z)) * 57.2957763671875))), client.player.onGround(), client.player.horizontalCollision));                        rateLimiter.onLookPacketSent();
+                    Objects.requireNonNull(client.getConnection()).send(new ServerboundMovePlayerPacket.Rot(Mth.wrapDegrees((float) (Mth.atan2(unit.z, unit.x) * 57.2957763671875) - 90.0f), Mth.wrapDegrees((float) (-(Mth.atan2(unit.y, Math.sqrt(unit.x * unit.x + unit.z * unit.z)) * 57.2957763671875))), client.player.onGround(), client.player.horizontalCollision));                        rateLimiter.onLookPacketSent();
                     rateLimiter.onLookPacketSent();
                 }
                 if (rateLimiter.canSendAnyPacket()) {
@@ -161,16 +250,26 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
                     rateLimiter.onPacketSent();
                 }
                 if (rateLimiter.canSendSwingPacket()) {
-                    client.executeIfPossible(() -> client.player.swing(InteractionHand.MAIN_HAND));
+                    client.executeIfPossible(() -> {
+                        if (client.player != null) {
+                            client.player.swing(InteractionHand.MAIN_HAND);
+                        }
+                    });
                     rateLimiter.onSwingPacketSent();
                 }
 
                 index++;
                 if (index >= song.notes.length) {
-                    stop();
+                    Song currentSong = song;
                     didSongReachEnd = true;
-                    if (loopSong) {
-                        start(song);
+                    if (playMode == PlayMode.SINGLE_LOOP) {
+                        start(currentSong);
+                    } else if (playMode == PlayMode.LIST_LOOP) {
+                        playNextSong();
+                    } else if (playMode == PlayMode.RANDOM) {
+                        playNextRandomSong();
+                    } else {
+                        stop();
                     }
                     break;
                 }
@@ -186,9 +285,9 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
     }
 
     @Override
-    public void onStartTick(ClientLevel world) {
+    public void onStartTick(@Nullable ClientLevel world) {
         Minecraft client = Minecraft.getInstance();
-        if (world == null || client.level == null || client.player == null) return;
+        if (client.level == null || client.player == null) return;
         if (song == null || !running) return;
 
         tuner.cleanup(); // Housekeeping
@@ -198,13 +297,13 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
             if (!tuner.selectSong(client, song)) {
                 if (!tuner.getMissingInstrumentBlocks().isEmpty()) {
                     ChatComponent chatHud = Minecraft.getInstance().gui.hud.getChat();
-                    chatHud.addMessage(Component.translatable(Main.MOD_ID + ".player.invalid_note_blocks").withStyle(ChatFormatting.RED), (MessageSignature)null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
-                    tuner.getMissingInstrumentBlocks().forEach((block, integer) -> chatHud.addMessage(Component.literal(block.getName().getString() + " × " + integer).withStyle(ChatFormatting.RED), (MessageSignature)null, GuiMessageSource.PLAYER, GuiMessageTag.chatError()));
+                    chatHud.addMessage(Component.translatable(Main.MOD_ID + ".player.invalid_note_blocks").withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+                    tuner.getMissingInstrumentBlocks().forEach((block, integer) -> chatHud.addMessage(Component.literal(block.getName().getString() + " × " + integer).withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError()));
                     stop();
                     return;
                 } else {
                     Main.LOGGER.error("Failed to select song to unknown / unexpected reason!");
-                    client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID + ".selectsong_fail_unknown").withStyle(ChatFormatting.RED), (MessageSignature)null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+                    client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID + ".selectsong_fail_unknown").withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
                     stop();
                     return;
                 }
@@ -218,12 +317,12 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
             Tuner.TuningFail tuningFail = tuner.tickTuning(client);
             if (tuningFail == Tuner.TuningFail.MovedTooFarAway) {
                 stop();
-                client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID + ".player.too_far").withStyle(ChatFormatting.RED), (MessageSignature)null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+                client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID + ".player.too_far").withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
                 return;
             } else if (tuningFail != null) {
                 stop();
                 Main.LOGGER.error("Tuning song failed: " + tuningFail.name());
-                client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID + ".player.tuning_fail_other", tuningFail.name()).withStyle(ChatFormatting.RED), (MessageSignature)null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+                client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID + ".player.tuning_fail_other", tuningFail.name()).withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
                 return;
             }
         }
@@ -255,5 +354,23 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
     public double getSongElapsedSeconds() {
         if (song == null) return 0;
         return song.ticksToMilliseconds(tick) / 1000;
+    }
+
+    public float getProgress() {
+        if (song == null) return 0;
+        return (float) (tick / song.length);
+    }
+
+    public String getFormattedTime() {
+        if (song == null) return "00:00 / 00:00";
+        double elapsedSeconds = song.ticksToMilliseconds(tick) / 1000;
+        double totalSeconds = song.getLengthInSeconds();
+        return formatTime(elapsedSeconds) + " / " + formatTime(totalSeconds);
+    }
+
+    private String formatTime(double seconds) {
+        int minutes = (int) (seconds / 60);
+        int secs = (int) (seconds % 60);
+        return String.format("%02d:%02d", minutes, secs);
     }
 }

@@ -97,8 +97,8 @@ public class Config implements ConfigData {
     public PlaybackPacketRatelimit playbackPacketRatelimit = PlaybackPacketRatelimit.Limit500;
 
 
-    @ConfigEntry.Gui.Tooltip(count = 1)
-    public float delayPlaybackStartBySecs = 0.0f;
+    @ConfigEntry.Gui.Tooltip()
+    public float delayPlaybackStartBySecs;
 
     @ConfigEntry.Gui.Tooltip(count = 3) public boolean instrumentDetectionWorkaround = true;
 
@@ -107,6 +107,9 @@ public class Config implements ConfigData {
 
     @ConfigEntry.Gui.Tooltip(count = 2)
     public boolean autoScrollToLastSelected = true;
+
+    @ConfigEntry.Gui.Tooltip()
+    public boolean rememberLastSelectedOnRestart;
 
     @ConfigEntry.Gui.Excluded
     public ArrayList<String> favorites = new ArrayList<>();

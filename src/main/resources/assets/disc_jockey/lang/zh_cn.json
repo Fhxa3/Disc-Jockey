@@ -6,6 +6,9 @@
   "disc_jockey.screen.preview.stop": "停止试听",
   "disc_jockey.screen.blocks.title": "音符盒",
   "disc_jockey.screen.blocks": "音符盒",
+  "disc_jockey.screen.blocks.header": "=== 音符盒需求 ===",
+  "disc_jockey.screen.blocks.song": "歌曲: %s",
+  "disc_jockey.screen.blocks.total": "所需音符盒总数: %s",
   "disc_jockey.screen.search": "搜索歌曲",
   "disc_jockey.screen.drop_hint": "将歌曲文件拖放到此窗口以添加它们",
   "disc_jockey.screen.drop_confirm": "您想将以下歌曲添加到 Disc Jockey 吗？",
@@ -85,5 +88,13 @@
   "text.autoconfig.disc_jockey.option.autoScrollToLastSelected": "自动滚动到上次所选",
   "text.autoconfig.disc_jockey.option.autoScrollToLastSelected.@Tooltip[0]": "打开菜单时自动滚动到上次所选的歌曲。",
   "text.autoconfig.disc_jockey.option.autoScrollToLastSelected.@Tooltip[1]": "同时自动导航到包含上次所选歌曲的文件夹。",
-  "modmenu.descriptionTranslation.disc_jockey": "在游戏中演奏nbs歌曲"
+  "text.autoconfig.disc_jockey.option.rememberLastSelectedOnRestart": "重启记忆上次选择",
+  "text.autoconfig.disc_jockey.option.rememberLastSelectedOnRestart.@Tooltip": "重启游戏时记忆上次选择的歌曲。",
+  "disc_jockey.screen.mode_single": "🔂单曲循环",
+  "disc_jockey.screen.mode_list": "🔁列表循环",
+  "disc_jockey.screen.mode_random": "🔀列表随机",
+  "disc_jockey.screen.mode_stop": "⏹播完停止",
+  "disc_jockey.screen.playback_title": "音符盒播放状态",
+  "disc_jockey.screen.preview_title": "试听状态",
+  "modmenu.descriptionTranslation.disc_jockey": "在游戏中演奏nbs或者midi歌曲"
 }

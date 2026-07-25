@@ -4,9 +4,9 @@ import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.network.chat.Component;
 import semmiedev.disc_jockey.Main;
 
-public class SongTimeSliderWidget extends AbstractSliderButton {
+public class PreviewTimeSliderWidget extends AbstractSliderButton {
 
-    public SongTimeSliderWidget(int x, int y, int width, int height) {
+    public PreviewTimeSliderWidget(int x, int y, int width, int height) {
         super(x, y, width, height, Component.empty(), 0);
     }
 
@@ -23,29 +23,29 @@ public class SongTimeSliderWidget extends AbstractSliderButton {
 
     @Override
     protected void updateMessage() {
-        if (Main.SONG_PLAYER.song == null) {
+        if (Main.PREVIEWER.getSong() == null) {
             setMessage(Component.empty());
         } else {
-            setMessage(Component.literal(formatTimestamp((int) Main.SONG_PLAYER.getSongElapsedSeconds()) + " / " + formatTimestamp((int) Main.SONG_PLAYER.song.getLengthInSeconds())));
+            setMessage(Component.literal(formatTimestamp((int) Main.PREVIEWER.getSongElapsedSeconds()) + " / " + formatTimestamp((int) Main.PREVIEWER.getSong().getLengthInSeconds())));
         }
     }
 
     @Override
     protected void applyValue() {
-        if(Main.SONG_PLAYER.song == null) return;
-        double total = Main.SONG_PLAYER.song.getLengthInSeconds();
+        if(Main.PREVIEWER.getSong() == null) return;
+        double total = Main.PREVIEWER.getSong().getLengthInSeconds();
         double seconds = value * total;
-        Main.SONG_PLAYER.setSongElapsedSeconds(seconds);
+        Main.PREVIEWER.setSongElapsedSeconds(seconds);
     }
 
     public void update() {
-        if (Main.SONG_PLAYER.song == null) {
+        if (Main.PREVIEWER.getSong() == null) {
             value = 0;
             setMessage(Component.empty());
             return;
         }
-        double elapsed = Main.SONG_PLAYER.getSongElapsedSeconds();
-        double total = Main.SONG_PLAYER.song.getLengthInSeconds();
+        double elapsed = Main.PREVIEWER.getSongElapsedSeconds();
+        double total = Main.PREVIEWER.getSong().getLengthInSeconds();
         value = elapsed / total;
         updateMessage();
     }
