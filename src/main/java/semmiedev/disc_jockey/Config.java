@@ -111,6 +111,9 @@ public class Config implements ConfigData {
     @ConfigEntry.Gui.Tooltip()
     public boolean rememberLastSelectedOnRestart;
 
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public boolean showProgressBarOverlay = true;
+
     @ConfigEntry.Gui.Excluded
     public ArrayList<String> favorites = new ArrayList<>();
 

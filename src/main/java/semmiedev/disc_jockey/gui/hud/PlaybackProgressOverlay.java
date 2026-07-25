@@ -19,7 +19,7 @@ public class PlaybackProgressOverlay implements HudElement {
         Minecraft client = Minecraft.getInstance();
         boolean isInGame = client.gui.screen() == null;
 
-        if (Main.SONG_PLAYER.running && Main.SONG_PLAYER.song != null && isInGame) {
+        if (Main.config.showProgressBarOverlay && Main.SONG_PLAYER.running && Main.SONG_PLAYER.song != null && isInGame) {
             int screenWidth = context.guiWidth();
             int screenHeight = context.guiHeight();
 
@@ -29,7 +29,7 @@ public class PlaybackProgressOverlay implements HudElement {
             renderProgressBar(context, barX, barY, Main.SONG_PLAYER.getProgress(), Main.SONG_PLAYER.getFormattedTime(), 0x8000FF00);
         }
 
-        if (Main.PREVIEWER.running && Main.PREVIEWER.getSong() != null && isInGame) {
+        if (Main.config.showProgressBarOverlay && Main.PREVIEWER.running && Main.PREVIEWER.getSong() != null && isInGame) {
             int screenWidth = context.guiWidth();
             int screenHeight = context.guiHeight();
 
