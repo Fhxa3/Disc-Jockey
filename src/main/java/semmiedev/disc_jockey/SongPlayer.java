@@ -211,7 +211,7 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
             GameType gameMode = client.gameMode == null ? null : client.gameMode.getPlayerMode();
             // In the best case, gameMode would only be queried in sync Ticks, no here
             if (gameMode == null || !gameMode.isSurvival()) {
-                client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".player.invalid_game_mode", gameMode == null ? "unknown" : gameMode.getLongDisplayName()).withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+                client.executeIfPossible(() -> client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".player.invalid_game_mode", gameMode == null ? "unknown" : gameMode.getLongDisplayName()).withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError()));
                 stop();
                 return;
             }
@@ -232,7 +232,7 @@ public class SongPlayer implements ClientTickEvents.StartLevelTick {
                 }
                 if (!Util.canInteractWith(client.player, blockPos)) {
                     stop();
-                    client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".player.too_far").withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError());
+                    client.executeIfPossible(() -> client.gui.hud.getChat().addMessage(Component.translatable(Main.MOD_ID+".player.too_far").withStyle(ChatFormatting.RED), null, GuiMessageSource.PLAYER, GuiMessageTag.chatError()));
                     return;
                 }
                 Vec3 unit = Vec3.upFromBottomCenterOf(blockPos, 0.5).subtract(client.player.getEyePosition()).normalize();
